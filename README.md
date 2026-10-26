@@ -4,7 +4,9 @@
 
 > Unofficial community fork. **Not affiliated with or endorsed by Creality.**
 
-![AD5X Design workspace](docs/images/design-main.jpg)
+[![AD5X Design workspace — click to watch the 42-second demo](docs/images/design-main.jpg)](https://raw.githubusercontent.com/OrryZA1/CrealityPrint-AD5X-Community/master/docs/media/design-tray-demo.mp4)
+
+*Click the screenshot above to watch the 42-second Design → Prepare → Preview demo.*
 
 ### [Download the Windows RC1 installer](https://github.com/OrryZA1/CrealityPrint-AD5X-Community/releases/tag/v7.3.0-ad5x-rc1)
 
@@ -24,7 +26,7 @@ It is a first-class workspace inside the native Creality Print application, aime
 
 **Design → Prepare → Slice / Preview → Print**
 
-### [▶ Watch the 42-second tray Design → Prepare → Preview demo](docs/media/design-tray-demo.mp4)
+### [▶ Watch the 42-second tray Design → Prepare → Preview demo](https://raw.githubusercontent.com/OrryZA1/CrealityPrint-AD5X-Community/master/docs/media/design-tray-demo.mp4)
 
 The demo shows a tray starting as simple geometry, being hollowed and divided, edited with practical tools, then handed directly into **Prepare** and **Preview**.
 
