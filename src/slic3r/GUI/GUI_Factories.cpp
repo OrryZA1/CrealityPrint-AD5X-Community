@@ -1,3 +1,10 @@
+#include <wx/stattext.h>
+#include <wx/spinctrl.h>
+#include <wx/dialog.h>
+#include <wx/sizer.h>
+#include <wx/msgdlg.h>
+#include "libslic3r/TriangleMesh.hpp"
+#include "MainFrame.hpp"
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/libslic3r.h"
@@ -977,10 +984,6 @@ wxMenuItem* MenuFactory::append_menu_item_settings(wxMenu* menu_)
 
     // Create new items for settings popupmenu
 
-    if (printer_technology() == ptFFF ||
-        (menu->GetMenuItems().size() > 0 && !menu->GetMenuItems().back()->IsSeparator()))
-        ;// menu->SetFirstSeparator();
-
     // detect itemm for adding of the setting
     ObjectList* object_list = obj_list();
     ObjectDataViewModel* obj_model = list_model();
@@ -1707,6 +1710,57 @@ MenuFactory::MenuFactory()
     }
 }
 
+static void open_ad5x_design_editor()
+{
+    // Navigation opens the native Design page rather than another window.
+    wxGetApp().mainframe->select_tab(MainFrame::tpAD5XDesign);
+}
+static void create_cad_lite_box()
+{
+    Plater* current_plater = wxGetApp().plater();
+    if (current_plater == nullptr || !current_plater->can_add_model())
+        return;
+
+    wxDialog dialog(wxGetApp().mainframe, wxID_ANY, "CAD Lite - Create Box",
+                    wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE);
+    auto* layout = new wxBoxSizer(wxVERTICAL);
+    layout->Add(new wxStaticText(&dialog, wxID_ANY, "Enter box dimensions in millimetres."),
+                0, wxALL, 12);
+
+    auto* grid = new wxFlexGridSizer(2, 3, 8);
+    auto add_dimension = [&](const wxString& title, double initial) {
+        grid->Add(new wxStaticText(&dialog, wxID_ANY, title), 0, wxALIGN_CENTER_VERTICAL);
+        auto* input = new wxSpinCtrlDouble(&dialog, wxID_ANY, wxEmptyString,
+                                           wxDefaultPosition, wxSize(145, -1),
+                                           wxSP_ARROW_KEYS, 0.5, 220.0, initial, 0.5);
+        input->SetDigits(1);
+        grid->Add(input, 0, wxEXPAND);
+        return input;
+    };
+    wxSpinCtrlDouble* length = add_dimension("Length (X)", 60.0);
+    wxSpinCtrlDouble* width  = add_dimension("Width (Y)", 40.0);
+    wxSpinCtrlDouble* height = add_dimension("Height (Z)", 10.0);
+    layout->Add(grid, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    layout->Add(dialog.CreateSeparatedButtonSizer(wxOK | wxCANCEL),
+                0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    dialog.SetSizerAndFit(layout);
+    if (dialog.ShowModal() != wxID_OK)
+        return;
+
+    const double x = length->GetValue();
+    const double y = width->GetValue();
+    const double z = height->GetValue();
+    if (x < 0.5 || y < 0.5 || z < 0.5 || x > 220.0 || y > 220.0 || z > 220.0) {
+        wxMessageBox("Each box dimension must be between 0.5 and 220 mm.",
+                     "CAD Lite", wxOK | wxICON_WARNING, wxGetApp().mainframe);
+        return;
+    }
+    Plater::TakeSnapshot snapshot(current_plater, "CAD Lite - Create Box");
+    TriangleMesh mesh(its_make_cube(x, y, z));
+    obj_list()->load_mesh_object(mesh,
+        wxString::Format("CAD Box %.1f x %.1f x %.1f mm", x, y, z));
+    wxGetApp().mainframe->update_title();
+}
 void MenuFactory::create_default_menu()
 {
     /*wxMenu* sub_menu_primitives = append_submenu_add_generic(&m_default_menu, ModelVolumeType::INVALID);
@@ -1743,6 +1797,15 @@ void MenuFactory::create_default_menu()
 
 #endif
 
+    append_menu_item(&m_default_menu, wxID_ANY, "AD5X Design - Tinkercad-style (offline)...",
+        "Open the local Tinkercad-style designer in this slicer",
+        [](wxCommandEvent&) { open_ad5x_design_editor(); }, "menu_add_part",
+        &m_default_menu, []() { return true; }, m_parent);
+    append_menu_item(&m_default_menu, wxID_ANY, "CAD Lite - Create Sized Box...",
+        "Create a printable box with exact dimensions in millimetres",
+        [](wxCommandEvent&) { create_cad_lite_box(); }, "menu_add_part",
+        &m_default_menu, []() { return plater() != nullptr && plater()->can_add_model(); },
+        m_parent);
     m_default_menu.AppendSeparator();
 
     append_menu_check_item(&m_default_menu, wxID_ANY, _L("Show Labels"), "",
@@ -1833,6 +1896,34 @@ void MenuFactory::create_extra_object_menu()
     // Modifier Part
     // BBS
     append_menu_items_add_volume(&m_object_menu);
+    append_menu_item(&m_object_menu, wxID_ANY, "AD5X Design - Tinkercad-style (offline)...",
+        "Open the local CAD designer without changing this object",
+        [](wxCommandEvent&) { open_ad5x_design_editor(); }, "menu_add_part",
+        &m_object_menu, []() { return true; }, m_parent);
+    // CAD Lite: use existing negative volumes and mesh Boolean operations.
+    // No new slicer geometry kernel or external dependencies.
+    wxMenu* cad_lite_menu = new wxMenu();
+    append_menu_item(cad_lite_menu, wxID_ANY, "Hole - Box",
+        "Add a subtractive cube to the selected object. Use Scale to set its size.",
+        [](wxCommandEvent&) {
+            obj_list()->load_generic_subobject("Cube", ModelVolumeType::NEGATIVE_VOLUME);
+        }, "menu_obj_cube", &m_object_menu,
+        []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+    append_menu_item(cad_lite_menu, wxID_ANY, "Hole - Cylinder",
+        "Add a subtractive cylinder to the selected object. Use Scale to set its size.",
+        [](wxCommandEvent&) {
+            obj_list()->load_generic_subobject("Cylinder", ModelVolumeType::NEGATIVE_VOLUME);
+        }, "menu_obj_cylinder", &m_object_menu,
+        []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+    cad_lite_menu->AppendSeparator();
+    append_menu_item(cad_lite_menu, wxID_ANY, "Group / Apply Holes",
+        "Bake all solids and negative volumes of this object into a single mesh (Undo available).",
+        [](wxCommandEvent&) { obj_list()->boolean(); }, "",
+        &m_object_menu, []() { return obj_list()->can_mesh_boolean(); }, m_parent);
+    append_submenu(&m_object_menu, cad_lite_menu, wxID_ANY, "CAD Lite - Solid / Hole",
+        "Tinkercad-style shape subtraction", "",
+        []() { return obj_list()->is_instance_or_object_selected(); }, m_parent);
+
     m_object_menu.AppendSeparator();
     // Set filament insert menu item here
     // Set Printable
@@ -2092,6 +2183,15 @@ void MenuFactory::create_plate_menu()
 
     // paste objects to the plate
     append_menu_item_paste(menu);
+    append_menu_item(menu, wxID_ANY, "AD5X Design - Tinkercad-style (offline)...",
+        "Open the local Tinkercad-style editor inside Creality Print",
+        [](wxCommandEvent&) { open_ad5x_design_editor(); }, "menu_add_part",
+        menu, []() { return true; }, m_parent);
+    append_menu_item(menu, wxID_ANY, "CAD Lite - Create Sized Box...",
+        "Create a printable box with exact dimensions in millimetres",
+        [](wxCommandEvent&) { create_cad_lite_box(); }, "menu_add_part",
+        menu, []() { return plater() != nullptr && plater()->can_add_model(); },
+        m_parent);
     // add shapes
     menu->AppendSeparator();
     /*wxMenu* sub_menu_primitives = append_submenu_add_generic(menu, ModelVolumeType::INVALID);
@@ -2592,7 +2692,6 @@ void MenuFactory::append_menu_item_set_printable(wxMenu* menu)
 
     for (wxDataViewItem item : sels) {
         ItemType type = list->GetModel()->GetItemType(item);
-        bool check;
         if (type != itInstance && type != itObject)
             continue;
         else {

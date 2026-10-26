@@ -246,12 +246,16 @@ PresetUpdater::priv::priv()
 	, vendor_path(fs::path(Slic3r::data_dir()) / PRESET_SYSTEM_DIR)
 	, cancel(false)
 {
-	//BBS: refine preset updater logic
-	enabled_version_check = true;
+	// Customized offline build: application/version checks are disabled.
+	enabled_version_check = false;
 	set_download_prefs(GUI::wxGetApp().app_config);
-	// Install indicies from resources. Only installs those that are either missing or older than in resources.
-	check_installed_vendor_profiles();
-    perform_updates(get_printer_config_updates(), false);
+
+	// Respect the user's system-preset freeze. Do not replace packaged/vendor
+	// profiles or apply cached printer-profile updates when synchronization is off.
+	if (GUI::wxGetApp().app_config->get("sync_system_preset") == "true") {
+		check_installed_vendor_profiles();
+		perform_updates(get_printer_config_updates(), false);
+	}
 	// Load indices from the cache directory.
 	//index_db = Index::load_db();
 }
@@ -261,11 +265,11 @@ void PresetUpdater::priv::set_download_prefs(AppConfig *app_config)
 {
 	version_check_url = app_config->version_check_url();
 
+	// Profile OTA/config replacement is permitted only when system-preset sync
+	// has been explicitly enabled. The customized build defaults it off.
 	auto profile_update_url = app_config->profile_update_url();
-	if (!profile_update_url.empty())
-		enabled_config_update = true;
-	else
-		enabled_config_update = false;
+	enabled_config_update =
+		app_config->get("sync_system_preset") == "true" && !profile_update_url.empty();
 }
 
 //BBS: refine the Preset Updater logic
@@ -1110,6 +1114,11 @@ void PresetUpdater::priv::check_installed_vendor_profiles() const
     BOOST_LOG_TRIVIAL(info) << "[CrealityPrint Updater]:Checking whether the profile from resource is newer";
 
     AppConfig *app_config = GUI::wxGetApp().app_config;
+    if (app_config->get("sync_system_preset") != "true") {
+        BOOST_LOG_TRIVIAL(info) << "[CrealityPrint Updater]: system preset synchronization disabled; packaged vendor refresh skipped";
+        return;
+    }
+
     const auto enabled_vendors = app_config->vendors();
 
     //BBS: refine the init check logic
@@ -1581,6 +1590,8 @@ bool PresetUpdater::install_bundles_rsrc(std::vector<std::string> bundles, bool 
 
 void PresetUpdater::on_update_notification_confirm()
 {
+	if (GUI::wxGetApp().app_config->get("sync_system_preset") != "true")
+		return;
 	if (!p->has_waiting_updates)
 		return;
 	BOOST_LOG_TRIVIAL(info) << format("Update of %1% bundles available. Asking for confirmation ...", p->waiting_updates.updates.size());
@@ -1611,6 +1622,8 @@ void PresetUpdater::on_update_notification_confirm()
 
 void PresetUpdater::do_printer_config_update()
 {
+    if (GUI::wxGetApp().app_config->get("sync_system_preset") != "true")
+        return;
     if (!p->has_waiting_printer_updates)
         return;
     BOOST_LOG_TRIVIAL(info) << "Update of printer configs available. Asking for confirmation ...";

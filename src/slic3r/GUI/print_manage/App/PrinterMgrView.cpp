@@ -1,4 +1,5 @@
-﻿#include "PrinterMgrView.hpp"
+#include "PrinterMgrView.hpp"
+#include "NativeAD5XStatusPanel.hpp"
 #include "TimeLapseShareManager.hpp"
 #include "../Device/LanDeviceProbe.hpp"
 
@@ -20,6 +21,7 @@
 #include <atomic>
 #include <cctype>
 #include <cstdint>
+#include <cstdlib>
 #include <chrono>
 #include <mutex>
 #include <regex>
@@ -240,12 +242,37 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
  {
     BOOST_LOG_TRIVIAL(warning) <<__FUNCTION__ << " Address: " << (void*) this;
     wxBoxSizer* topsizer = new wxBoxSizer(wxVERTICAL);
+    // AD5X native read-only status remains available but is hidden in normal
+    // Device/Fluidd mode. No native panel or background polling unless opted in.
+    const char* native_mode = std::getenv("CREALITY_AD5X_NATIVE_ONLY");
+    const char* native_address_env = std::getenv("CREALITY_AD5X_NATIVE_ADDRESS");
+    const std::string native_address = native_address_env ? native_address_env : "";
+    const bool native_only_requested = native_mode && std::string(native_mode) == "1";
+    const bool native_only = native_only_requested && !native_address.empty();
+    const char* show_native_env = std::getenv("CREALITY_AD5X_SHOW_NATIVE_STATUS");
+    const bool show_native_status_requested = native_only_requested ||
+        (show_native_env && std::string(show_native_env) == "1");
+    const bool show_native_status = show_native_status_requested && !native_address.empty();
+    if (show_native_status) {
+        auto* ad5x_native_status = new NativeAD5XStatusPanel(this, native_address);
+        topsizer->Add(ad5x_native_status, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 10);
+    } else if (show_native_status_requested) {
+        BOOST_LOG_TRIVIAL(warning) << "AD5X native status requested without CREALITY_AD5X_NATIVE_ADDRESS; using normal Device/Fluidd mode";
+    }
+
+    // Experimental native-only Device tab stays available as an opt-in.
+    if (native_only) {
+        BOOST_LOG_TRIVIAL(info) << "AD5X native-only Device tab selected";
+        SetSizer(topsizer);
+        return;
+    }
 
       // Create the webview
     m_browser = WebView::CreateWebView(this, "");
     if (m_browser == nullptr) {
         BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " m_browser is null!!! ";
-        wxLogError("Could not init m_browser");
+        BOOST_LOG_TRIVIAL(warning) << "AD5X native panel remains available without Device WebView";
+        SetSizer(topsizer); // AD5X native status remains visible if WebView2 is unavailable.
         return;
     }
     const DeviceWebViewHandle browser_handle = make_device_webview_handle(m_browser);
@@ -256,51 +283,11 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
 #endif
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " m_browser address: " << (void*) m_browser;
 
-    m_time_lapse_share_event_bridge = std::make_shared<TimeLapseShareEventBridge>();
-    m_time_lapse_share_event_bridge->view = this;
-    std::weak_ptr<TimeLapseShareEventBridge> weak_share_bridge = m_time_lapse_share_event_bridge;
-    m_time_lapse_share_manager = std::make_unique<TimeLapseShare::TimeLapseShareManager>(
-        [weak_share_bridge](const TimeLapseShare::ShareEvent& event) {
-            const auto bridge = weak_share_bridge.lock();
-            if (!bridge || !bridge->active.load(std::memory_order_acquire) || wxTheApp == nullptr)
-                return;
+    // Offline AD5X build: cloud time-lapse sharing is disabled, so do not
+    // create its background worker or account-session bridge.
 
-            wxTheApp->CallAfter([bridge, event] {
-                if (bridge->active.load(std::memory_order_acquire) && bridge->view != nullptr)
-                    bridge->view->send_time_lapse_share_event(event);
-            });
-        },
-        [] { return current_cloud_account_session(); });
-
-    // Reuse the weak UI lifetime bridge: queued events cannot outlive this view.
-    m_cloud_mqtt = std::make_unique<CloudDeviceMqttSession>(MakeCloudDeviceMqttTransport,
-        [weak_share_bridge](CloudDeviceMqttSession::Event event) {
-            auto bridge = weak_share_bridge.lock();
-            if (!bridge || !bridge->active.load() || wxTheApp == nullptr) return;
-            wxTheApp->CallAfter([bridge, event = std::move(event)] {
-                if (!bridge->active.load() || !bridge->view) return;
-                auto* view = bridge->view;
-                // Account/token may have changed while this event was queued.
-                view->initMqtt();
-                if (!view->m_cloud_mqtt || !view->m_cloud_mqtt->IsCurrent(event.generation)) return;
-                if (event.state == "message") {
-                    view->processMqttMessage({}, event.payload);
-                    return;
-                }
-                BOOST_LOG_TRIVIAL(info) << "[CloudDeviceMQTT] state=" << event.state
-                    << " generation=" << event.generation << " attempt=" << event.attempt
-                    << " retry_ms=" << event.retry_delay.count() << " error=" << event.error;
-                nlohmann::json command = {{"command", "cloud_device_mqtt_state"}, {"data", {
-                    {"address", event.address}, {"userId", event.user_id}, {"region", event.region},
-                    {"state", event.state}, {"generation", event.generation}, {"error", event.error}}}};
-                if (view->m_browser)
-                    view->run_script(wxString::Format("window.handleStudioCmd('%s');",
-                        RemotePrint::Utils::url_encode(command.dump(-1, ' ', true))).ToStdString());
-            });
-        });
-    m_cloud_mqtt_timer.SetOwner(this);
-    Bind(wxEVT_TIMER, [this](wxTimerEvent&) { initMqtt(); }, m_cloud_mqtt_timer.GetId());
-    m_cloud_mqtt_timer.Start(2000);
+    // Offline AD5X build: cloud MQTT is disabled. Local Device/Fluidd WebView
+    // and LAN WebSocket proxy initialization below remain unchanged.
 
     m_ws_proxy = std::make_unique<WebSocketProxy::Manager>(
         [this](const std::string& script) {
@@ -309,11 +296,10 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
         });
     wxString ws_proxy_script = WebSocketProxy::GetWebSocketProxyScript();
     if (!ws_proxy_script.IsEmpty()) {
-        std::cout << "[PrinterMgrView::PrinterMgrView] AddUserScript ws_proxy, policy=lan_device"
-                  << std::endl;
+        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << ": add WebSocket proxy user script, policy=lan_device";
         m_browser->AddUserScript(ws_proxy_script);
     } else {
-        std::cout << "[PrinterMgrView::PrinterMgrView] ws_proxy script empty, skip" << std::endl;
+        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << ": WebSocket proxy script empty; skipping";
     }
 
     m_browser->Bind(wxEVT_WEBVIEW_ERROR, &PrinterMgrView::OnError, this);
@@ -402,17 +388,6 @@ PrinterMgrView::PrinterMgrView(wxWindow *parent)
     DM::AppMgr::Ins().RegisterEvents(m_browser, std::vector<std::string>{DM::EVENT_SET_CURRENT_DEVICE, DM::EVENT_FORWARD_DEVICE_DETAIL});
     //initMqtt();
  }
-inline int get_current_milliseconds(void) {
-    // ?????j?????
-    auto now = std::chrono::system_clock::now();
-  
-   // ????j??????????????????
-   auto duration = now.time_since_epoch();
-   auto timestamp_milliseconds =
-       std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
- 
-   return (int)timestamp_milliseconds;
-}
 void PrinterMgrView::destoryMqtt()
 {
     m_cloud_mqtt_timer.Stop();
@@ -426,6 +401,9 @@ void PrinterMgrView::destoryMqtt()
 
 void PrinterMgrView::initMqtt()
 {
+    // Offline AD5X build: Creality Cloud MQTT is hard-disabled.
+    return;
+
     if (!m_cloud_mqtt) return;
     // Capture credentials only on the UI thread; workers never read GUI_App.
     const auto& user = wxGetApp().get_user();
@@ -508,7 +486,7 @@ PrinterMgrView::~PrinterMgrView()
     m_browser->Stop();
     m_browser->RemoveScriptMessageHandler("wx");
 #endif
-    DM::AppMgr::Ins().UnRegister(m_browser);
+    if (m_browser) DM::AppMgr::Ins().UnRegister(m_browser);
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Start";
     destoryMqtt();
     if (m_scanPoolThread.joinable())
@@ -555,6 +533,7 @@ void PrinterMgrView::on_switch_to_device_page()
 
 void PrinterMgrView::reload()
 {
+    if (!m_browser) return;
     void* backend_before = m_browser->GetNativeBackend();
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
                                << ", Backend Ptr BEFORE: " << backend_before ;
@@ -588,6 +567,7 @@ void PrinterMgrView::OnClose(wxCloseEvent& evt)
 
 void PrinterMgrView::SendAPIKey()
 {
+    if (!m_browser) return;
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " start";
     if (m_apikey_sent || m_apikey.IsEmpty())
         return;
@@ -612,11 +592,10 @@ void PrinterMgrView::SendAPIKey()
     m_browser->AddUserScript(script);
     wxString ws_script = WebSocketProxy::GetWebSocketProxyScript();
     if (!ws_script.IsEmpty()) {
-        std::cout << "[PrinterMgrView::SendAPIKey] AddUserScript ws_proxy, policy=lan_device"
-                  << std::endl;
+        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << ": add WebSocket proxy user script, policy=lan_device";
         m_browser->AddUserScript(ws_script);
     } else {
-        std::cout << "[PrinterMgrView::SendAPIKey] ws_proxy script empty, skip" << std::endl;
+        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << ": WebSocket proxy script empty; skipping";
     }
     m_browser->Reload();
 
@@ -853,6 +832,17 @@ void PrinterMgrView::handle_start_time_lapse_share(const nlohmann::json& json_da
 {
     TimeLapseShare::ShareRequest request;
     request.request_id = json_identifier_value(json_data, "requestId");
+
+    // Offline AD5X build: cloud/OSS time-lapse sharing is unavailable.
+    TimeLapseShare::ShareEvent offline_event;
+    offline_event.type = TimeLapseShare::EventType::Error;
+    offline_event.request_id = request.request_id;
+    offline_event.stage = "error";
+    offline_event.error_code = "offline_disabled";
+    offline_event.error_message = "Cloud time-lapse sharing is disabled in this offline build";
+    send_time_lapse_share_event(offline_event);
+    return;
+
     request.address = json_string_value(json_data, "address");
     request.video = json_string_value(json_data, "video");
     request.video_id = json_identifier_value(json_data, "videoid");
@@ -1338,11 +1328,7 @@ void PrinterMgrView::OnScriptMessage(wxWebViewEvent& evt)
         }
         else if (strCmd.compare("common_openurl") == 0)
         {
-            boost::optional<std::string> path = j["url"];
-            if (path.has_value())
-            {
-                wxLaunchDefaultBrowser(path.value());
-            }
+            // Offline AD5X build: Device frontend may not launch arbitrary web URLs.
         }
         else if (strCmd == "scan_device")
         {
@@ -2414,8 +2400,8 @@ void PrinterMgrView::handle_set_device_relate_to_account(const nlohmann::json& j
         else {
             AccountDeviceMgr::getInstance().unbind_device(device_mac);
         }
-    } catch (std::exception& e) {
-
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": device relation update failed: " << e.what();
     }
 }
 
@@ -2441,6 +2427,7 @@ void PrinterMgrView::update_current_cxy_device_filament(const std::string& mac)
 
 void PrinterMgrView::forward_init_device_cmd_to_printer_list()
 {
+    if (!m_browser) return;
     if (!Slic3r::GUI::wxGetApp().is_login()) {
         return;
     }
@@ -2468,7 +2455,7 @@ void PrinterMgrView::forward_init_device_cmd_to_printer_list()
         WebView::RunScript(m_browser, wxString::Format("window.handleStudioCmd('%s')", RemotePrint::Utils::url_encode(commandJson.dump())));
     }
     catch (const std::exception& e) {
-        std::cout << "forward_init_device_cmd_to_printer_list failed" << std::endl;
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": forward_init_device_cmd_to_printer_list failed: " << e.what();
     }
 
 }
@@ -2842,6 +2829,10 @@ int PrinterMgrView::load_machine_preset_data()
             return -1;
         }
     }else{
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__
+                                   << ": local machineList.json not found; cloud fallback disabled";
+        return -1;
+
         auto printer_list_file = fs::path(data_dir()).append("system").append("Creality").append("machineList.json").string();
         std::string base_url   = get_cloud_api_url();
         auto preupload_profile_url = "/api/cxy/v2/slice/profile/official/printerList";

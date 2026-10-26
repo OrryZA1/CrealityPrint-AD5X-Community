@@ -31,14 +31,15 @@ namespace DM{
 
         //
         this->Handler({"get_user"}, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
-            auto user = wxGetApp().get_user();
             std::string country_code = wxGetApp().app_config->get("region");
             unsigned pid = Slic3r::get_current_pid();
 
+            // Offline AD5X build: Device/Fluidd receives no Creality Cloud
+            // identity. LAN printer discovery/control is independent of this.
             nlohmann::json top_level_json = {
-                {"bLogin", user.bLogin ? 1 : 0},
-                {"token", user.token},
-                {"userId", user.userId},
+                {"bLogin", 0},
+                {"token", ""},
+                {"userId", ""},
                 {"region", country_code},
                 {"pid", pid}
             };
@@ -53,9 +54,8 @@ namespace DM{
             });
 
         //
-        this->Handler({ "common_openurl" }, [](wxWebView* browse, const std::string& data, nlohmann::json& json_data, const std::string cmd) {
-            wxLaunchDefaultBrowser(json_data["url"]);
-
+        this->Handler({ "common_openurl" }, [](wxWebView*, const std::string&, nlohmann::json&, const std::string) {
+            // Offline AD5X build: Device frontend may not launch arbitrary web URLs.
             return true;
             });
 

@@ -575,10 +575,9 @@ void CxSentToPrinterDialog::OnScriptMessage(wxWebViewEvent& evt)
             }
 
         } else if (strCmd == "common_openurl") {
-            wxLaunchDefaultBrowser(j["url"]);
-            wxPostEvent(this, wxCloseEvent(wxEVT_CLOSE_WINDOW));
+            // Offline AD5X build: Send Print frontend may not launch arbitrary web URLs.
         }else if (strCmd == "common_open_wiki_url") {
-            wxLaunchDefaultBrowser(j["url"]);
+            // Offline AD5X build: Send Print frontend may not launch external wiki URLs.
         } else if (strCmd == "test_exec_js_respone") {
             Test::EVENT_SPREAD("test_exec_js_respone", strInput.ToStdString());
         }
@@ -2613,6 +2612,10 @@ int CxSentToPrinterDialog::load_machine_preset_data()
             return -1;
         }
     }else{
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__
+                                   << ": local machineList.json not found; cloud fallback disabled";
+        return -1;
+
         auto printer_list_file = fs::path(data_dir()).append("system").append("Creality").append("machineList.json").string();
         std::string base_url   = get_cloud_api_url();
         auto preupload_profile_url = "/api/cxy/v2/slice/profile/official/printerList";

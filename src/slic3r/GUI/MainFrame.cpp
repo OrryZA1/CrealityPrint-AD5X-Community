@@ -9,11 +9,18 @@
 #include <wx/simplebook.h>
 #include <wx/icon.h>
 #include <wx/sizer.h>
+#include <wx/button.h>
+#include <wx/filedlg.h>
+#include <wx/file.h>
+#include <wx/filename.h>
+#include <wx/stdpaths.h>
+#include <cstdint>
+
+#include <wx/stattext.h>
 #include <wx/menu.h>
 #include <wx/progdlg.h>
 #include <wx/tooltip.h>
 //#include <wx/glcanvas.h>
-#include <wx/filename.h>
 #include <wx/debug.h>
 #include <wx/utils.h> 
 
@@ -115,6 +122,40 @@ static void ensure_web_model_view_ready(WebModelLibraryView* model_view)
     }
 
     model_view->Show();
+}
+
+static boost::filesystem::path ad5x_design_service_root()
+{
+    return into_path(wxStandardPaths::Get().GetExecutablePath()).parent_path() /
+        "External_Runtime_Dependency_AD5X_Design_Service_20261025";
+}
+
+static boost::filesystem::path ad5x_design_spool_path()
+{
+    return ad5x_design_service_root() / "Handoff_Spool";
+}
+
+static wxString ad5x_design_node_path()
+{
+    const boost::filesystem::path service_root = ad5x_design_service_root();
+    const boost::filesystem::path bundled_node = service_root / "node.exe";
+    if (boost::filesystem::exists(bundled_node))
+        return from_path(bundled_node);
+
+    const boost::filesystem::path bundled_node_dir = service_root / "node" / "node.exe";
+    if (boost::filesystem::exists(bundled_node_dir))
+        return from_path(bundled_node_dir);
+
+    const boost::filesystem::path exe_dir =
+        into_path(wxStandardPaths::Get().GetExecutablePath()).parent_path();
+    const boost::filesystem::path project_node =
+        exe_dir.parent_path().parent_path() /
+        "03_Tools" / "NodeJS_22.16.0_Portable" / "node.exe";
+    if (boost::filesystem::exists(project_node))
+        return from_path(project_node);
+
+    // Final fallback lets Windows resolve node.exe from PATH.
+    return "node.exe";
 }
 
 wxDEFINE_EVENT(EVT_SELECT_TAB, wxCommandEvent);
@@ -1129,7 +1170,8 @@ void MainFrame::update_layout()
 
     // From the very beginning the Print settings should be selected
     //m_last_selected_tab = m_layout == ESettingsLayout::Dlg ? 0 : 1;
-    m_last_selected_tab = 1;
+    // Offline AD5X build: Prepare is the safe default/restore target.
+    m_last_selected_tab = tp3DEditor;
 
     // Set new settings
     switch (m_layout)
@@ -1334,6 +1376,9 @@ void MainFrame::destroy_webviews_for_recreate()
     destroy_view(m_webview);
     destroy_view(m_webmodellibrary_view);
     destroy_view(m_ai_creation_view);
+    destroy_view(m_ad5x_design_page);
+    m_ad5x_design_browser = nullptr;
+    m_ad5x_design_loaded = false;
     destroy_view(m_printer_view);
     destroy_view(m_printer_mgr_view);
 }
@@ -1430,7 +1475,12 @@ void MainFrame::init_tabpanel() {
         //BBS
         wxWindow* panel = m_tabpanel->GetCurrentPage();
         int sel = m_tabpanel->GetSelection();
-        std::cout<<"select:"<<sel<<std::endl;
+        // Offline AD5X build: reject direct notebook activation of cloud-backed
+        // Home / Online Models / AI Creation pages before they can navigate.
+        if (panel == m_webview || panel == m_webmodellibrary_view || panel == m_ai_creation_view) {
+            CallAfter([this] { select_tab(tp3DEditor); });
+            return;
+        }
         //wxString page_text = m_tabpanel->GetPageText(sel);
         m_last_selected_tab = m_tabpanel->GetSelection();
         // Keep topbar tabs (BBLTopbar::m_tabCtrol) in sync with the current notebook page.
@@ -1448,10 +1498,44 @@ void MainFrame::init_tabpanel() {
                 topbar_sel = static_cast<size_t>(tpAICreation);
                 ensure_web_model_view_ready(m_ai_creation_view);
             }
+            else if (panel == m_ad5x_design_page)
+                topbar_sel = static_cast<size_t>(tpAD5XDesign);
             else if (panel == m_webview)
                 topbar_sel = static_cast<size_t>(tpHome);
             m_topbar->SetSelection(topbar_sel);
         }
+        if (panel == m_ad5x_design_page && m_ad5x_design_browser && !m_ad5x_design_loaded) {
+            const boost::filesystem::path service_root = ad5x_design_service_root();
+            const boost::filesystem::path script_path = service_root / "serve_handoff.cjs";
+            const boost::filesystem::path assets_path = service_root / "www";
+            const boost::filesystem::path spool_path = ad5x_design_spool_path();
+            const wxString node = ad5x_design_node_path();
+
+            if (!boost::filesystem::exists(script_path) ||
+                !boost::filesystem::exists(assets_path / "index.html")) {
+                BOOST_LOG_TRIVIAL(error) << "AD5X Design runtime is incomplete at "
+                                         << service_root.string();
+            } else {
+                boost::system::error_code ec;
+                boost::filesystem::create_directories(spool_path, ec);
+                if (ec) {
+                    BOOST_LOG_TRIVIAL(error) << "AD5X Design spool creation failed: " << ec.message();
+                } else {
+                    const wxString command =
+                        "\"" + node + "\" \"" + from_path(script_path) + "\" \"" +
+                        from_path(assets_path) + "\" 18195 \"" + from_path(spool_path) + "\"";
+                    const long bridge_pid = wxExecute(command, wxEXEC_ASYNC | wxEXEC_HIDE_CONSOLE);
+                    if (bridge_pid == 0) {
+                        BOOST_LOG_TRIVIAL(error) << "AD5X Design bridge failed to launch.";
+                    } else {
+                        m_ad5x_design_loaded = true;
+                        BOOST_LOG_TRIVIAL(info) << "AD5X Design bridge launch requested, pid=" << bridge_pid;
+                        m_ad5x_design_browser->LoadURL("http://127.0.0.1:18195/");
+                    }
+                }
+            }
+        }
+
         if (panel == m_plater) {
             if (sel == tp3DEditor) {
                 if (m_tab_event_enabled) {
@@ -1575,6 +1659,107 @@ void MainFrame::init_tabpanel() {
     m_ai_creation_view->SetStartPage(wxString::FromUTF8(get_ai_creation_webaddress()));
     m_tabpanel->AddPage(m_ai_creation_view, _L("AI Creation"), "tab_ai_creation_active", "tab_ai_creation", false);
     m_ai_creation_view->Hide();
+    // Native notebook tab appended after existing pages. The printer,
+    // Prepare, Preview and Device tab indices stay unchanged.
+    m_ad5x_design_page = new wxPanel(m_tabpanel, tpAD5XDesign);
+    m_ad5x_design_page->SetId(tpAD5XDesign);
+    auto* design_sizer = new wxBoxSizer(wxVERTICAL);
+    auto* design_header = new wxBoxSizer(wxHORIZONTAL);
+    design_header->Add(new wxStaticText(m_ad5x_design_page, wxID_ANY,
+        "AD5X Design - offline 3D editor"),
+        1, wxALL | wxALIGN_CENTER_VERTICAL, 7);
+    auto* import_stl = new wxButton(m_ad5x_design_page, wxID_ANY, "Send to Prepare");
+    design_header->Add(import_stl, 0, wxALL, 4);
+    design_sizer->Add(design_header, 0, wxEXPAND);
+    m_ad5x_design_browser = WebView::CreateWebView(m_ad5x_design_page, "");
+    if (m_ad5x_design_browser)
+        design_sizer->Add(m_ad5x_design_browser, 1, wxEXPAND);
+    else
+        design_sizer->Add(new wxStaticText(m_ad5x_design_page, wxID_ANY,
+            "Design WebView is unavailable."), 0, wxALL, 16);
+    m_ad5x_design_page->SetSizer(design_sizer);
+    // Strictly scoped local Design bridge. The WebView receives NO file path:
+    // only a random 32-character hex ticket from the loopback-only spool host.
+    // Unknown commands are ignored; a loaded project never changes on failure.
+    if (m_ad5x_design_browser) {
+        m_ad5x_design_browser->Bind(wxEVT_WEBVIEW_ERROR,
+            [this](wxWebViewEvent& evt) {
+                const wxString url = evt.GetURL();
+                if (url.StartsWith("http://127.0.0.1:18195/")) {
+                    m_ad5x_design_loaded = false;
+                    BOOST_LOG_TRIVIAL(error) << "AD5X Design WebView failed to load local bridge: "
+                                             << into_u8(evt.GetString());
+                }
+            }, m_ad5x_design_browser->GetId());
+
+        m_ad5x_design_browser->Bind(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED,
+            [this](wxWebViewEvent& evt) {
+                const wxString prefix = "AD5X_PREPARE:";
+                const wxString raw = evt.GetString();
+                if (!raw.StartsWith(prefix) || !m_ad5x_design_browser) return;
+                const wxString ticket = raw.Mid(prefix.length());
+                if (ticket.length() != 36 || !ticket.EndsWith(".stl")) return;
+                for (size_t i = 0; i < 32; ++i) {
+                    const wxChar c = ticket[i];
+                    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return;
+                }
+                const wxString page = m_ad5x_design_browser->GetCurrentURL();
+                if (!page.StartsWith("http://127.0.0.1:18195/")) return;
+                const auto reply = [this, ticket](bool ok) {
+                    if (!m_ad5x_design_browser) return;
+                    const wxString script =
+                        "window.dispatchEvent(new CustomEvent('ad5x-prepare-result',"
+                        "{detail:{ticket:'" + ticket + "',ok:" +
+                        (ok ? "true" : "false") +
+                        ",error:'Creality Print could not import the staged STL.'}}));";
+                    m_ad5x_design_browser->RunScript(script);
+                };
+                const wxString spool = from_path(ad5x_design_spool_path());
+                const wxFileName staged(spool, ticket);
+                const wxString file = staged.GetFullPath();
+                if (!staged.FileExists()) { reply(false); return; }
+                const auto length = staged.GetSize().GetValue();
+                if (length < 134 || length > 80ull * 1024 * 1024) {
+                    reply(false); return;
+                }
+                wxFile binary(file);
+                char header[84] = {};
+                if (!binary.IsOpened() || binary.Read(header, 84) != 84) {
+                    reply(false); return;
+                }
+                const auto count = static_cast<uint32_t>(static_cast<unsigned char>(header[80])) |
+                    (static_cast<uint32_t>(static_cast<unsigned char>(header[81])) << 8) |
+                    (static_cast<uint32_t>(static_cast<unsigned char>(header[82])) << 16) |
+                    (static_cast<uint32_t>(static_cast<unsigned char>(header[83])) << 24);
+                if (!count || 84ull + 50ull * count != length) {
+                    reply(false); return;
+                }
+                binary.Close();
+                if (!m_plater) { reply(false); return; }
+                try {
+                    wxArrayString paths;
+                    paths.Add(file);
+                    // This is exactly the existing native Plater STL import, but
+                    // without asking the user to pick a file manually.
+                    if (!m_plater->load_files(paths)) { reply(false); return; }
+                    reply(true);
+                    select_tab(tp3DEditor);
+                } catch (const std::exception& e) {
+                    BOOST_LOG_TRIVIAL(error) << "AD5X Send to Prepare import failed: " << e.what();
+                    reply(false);
+                } catch (...) {
+                    BOOST_LOG_TRIVIAL(error) << "AD5X Send to Prepare import failed with an unknown exception.";
+                    reply(false);
+                }
+            }, m_ad5x_design_browser->GetId());
+    }
+    import_stl->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        if (m_ad5x_design_browser)
+            m_ad5x_design_browser->RunScript(
+                "window.dispatchEvent(new Event('ad5x-send-to-prepare'));");
+    });
+    m_tabpanel->AddPage(m_ad5x_design_page, "Design", "", "", false);
+    m_ad5x_design_page->Hide();
     if(m_plater) {
         m_plater->create_send_to_printer_dlg();  // BBS : pre create the send dialog on program startup
     }
@@ -2904,25 +3089,7 @@ static wxMenu* generate_help_menu(MainFrame* mainframe)
     //    [](wxCommandEvent&) {
     //        //TODO
     //    });
-#if !defined(CUSTOMIZED) || defined(CUSTOM_CHECKUPDATE_ENABLED)
-    // Check New Version
-    append_menu_item(helpMenu, wxID_ANY, _L("Check for Update"), _L("Check for Update"),
-        [](wxCommandEvent&) {
-
-            wxGetApp().check_new_version_cx(true, 1);
-
-        }, "", nullptr, []() {
-            return true;
-        });
-
-    // -- hide the network test
-    //append_menu_item(helpMenu, wxID_ANY, _L("Open Network Test"), _L("Open Network Test"), [](wxCommandEvent&) {
-    //        NetworkTestDialog dlg(wxGetApp().mainframe);
-    //        dlg.ShowModal();
-    //    });
-
-    helpMenu->AppendSeparator();
-#endif
+    // Offline AD5X build: update checks are intentionally unavailable.
 
     // use course
     append_menu_item(helpMenu, wxID_ANY, _L("Use Course"), _L("Use Course"), [](wxCommandEvent&) {
@@ -4810,6 +4977,11 @@ void MainFrame::jump_to_multipage()
 //BBS GUI refactor: remove unused layout new/dlg
 void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
 {
+    // Offline AD5X build: online/community/AI pages remain allocated only to
+    // preserve notebook/window IDs. Any attempt to activate them returns to Prepare.
+    if (tab == tpHome || tab == tpOnlineModel || tab == tpAICreation)
+        tab = tp3DEditor;
+
     //bool tabpanel_was_hidden = false;
 
     // Controls on page are created on active page of active tab now.
@@ -4819,6 +4991,11 @@ void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
         //BBS GUI refactor: remove unused layout new/dlg
         //size_t new_selection = tab == (size_t)(-1) ? m_last_selected_tab : (m_layout == ESettingsLayout::Dlg && tab != 0) ? tab - 1 : tab;
         size_t new_selection = tab == (size_t)(-1) ? m_last_selected_tab : tab;
+        if (tab == tpAD5XDesign && m_ad5x_design_page) {
+            const int idx = m_tabpanel->FindPage(m_ad5x_design_page);
+            if (idx == wxNOT_FOUND) return;
+            new_selection = static_cast<size_t>(idx);
+        }
         if (tab == tpAICreation) {
             if (!m_ai_creation_view)
                 return;
@@ -4832,7 +5009,8 @@ void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
         {
             m_tabpanel->SetSelection(new_selection);
             if(this->topbar())
-                this->topbar()->SetSelection(m_tabpanel->GetCurrentPage() == m_ai_creation_view ? tpAICreation : new_selection);
+                this->topbar()->SetSelection(m_tabpanel->GetCurrentPage() == m_ai_creation_view ? tpAICreation :
+                    m_tabpanel->GetCurrentPage() == m_ad5x_design_page ? tpAD5XDesign : new_selection);
         }
 #ifdef _MSW_DARK_MODE
         /*if (wxGetApp().tabs_as_menu()) {

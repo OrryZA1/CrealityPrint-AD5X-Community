@@ -29,7 +29,6 @@
 #include <cstdlib>
 #include <cstdio>
 #include <ctime>
-#include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <unordered_set>
@@ -1320,14 +1319,7 @@ std::string safe_json_dump(const json& value)
 
 void append_ai_send_debug_log(const std::string& tag, const std::string& content)
 {
-    std::ofstream log_file("D:/log.txt", std::ios::app);
-    if (!log_file.is_open())
-        return;
-
-    std::time_t now = std::time(nullptr);
-    char        buf[64];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-    log_file << "[" << buf << "][" << tag << "] " << content << "\n";
+    BOOST_LOG_TRIVIAL(debug) << "[" << tag << "] " << content;
 }
 
 void log_ai_send_stage(const std::string& stage,

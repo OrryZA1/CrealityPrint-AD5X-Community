@@ -187,26 +187,18 @@ bool ProfileLoader::_LoadModelImpl(ProfileModel& profile, const std::string& ven
         return false;
     std::vector<std::string> nozzle_group;
     std::string nozzles = model_data["nozzle_diameter"];
-    int idx = 0;
-    while (idx != std::string::npos && idx < nozzles.size())
+    std::string::size_type idx = 0;
+    while (idx < nozzles.size())
     {
-        int index = nozzles.find(';', idx);
+        const std::string::size_type index = nozzles.find(';', idx);
+        if (index == std::string::npos)
+        {
+            nozzle_group.emplace_back(nozzles.substr(idx));
+            break;
+        }
         if (idx < index)
-        {
-            std::string nozzle = nozzles.substr(idx, index - idx);
-            nozzle_group.emplace_back(nozzle);
-            idx = index + 1;
-        }
-        else if (index == std::string::npos)
-        {
-            std::string nozzle = nozzles.substr(idx);
-            nozzle_group.emplace_back(nozzle);
-            idx = index;
-        }
-        else
-        {
-            idx = std::string::npos;
-        }
+            nozzle_group.emplace_back(nozzles.substr(idx, index - idx));
+        idx = index + 1;
     }
 
     profile.model = model;
@@ -595,7 +587,8 @@ void AppConfig::set_defaults()
     }
 
     if (get("show_home_page").empty()) {
-        set_bool("show_home_page", true);
+        // Customized offline build: do not open the cloud home page automatically.
+        set_bool("show_home_page", false);
     }
 
     if (get("show_printable_box").empty()) {
@@ -655,7 +648,8 @@ void AppConfig::set_defaults()
     // }
 
     if (get("sync_system_preset").empty()) {
-        set_bool("sync_system_preset", true);
+        // Customized offline build: never opt a new profile into automatic system-preset replacement.
+        set_bool("sync_system_preset", false);
     }
 
     if (get("backup_switch").empty() || get("version") < "01.06.00.00") {
@@ -1866,7 +1860,7 @@ EasyCache::EasyCache()
         } 
         catch (const std::exception& err)
         {
-            BOOST_LOG_TRIVIAL(info) << "EasyCache constructer failed. Maybe json parser failed";
+            BOOST_LOG_TRIVIAL(info) << "EasyCache constructor failed while parsing JSON: " << err.what();
         }
     }
 }

@@ -243,8 +243,12 @@ void AccountDeviceMgr::save_to_file()
 }
 
 
-void AccountDeviceMgr::sync_to_cloud() 
+void AccountDeviceMgr::sync_to_cloud()
 {
+    // Offline AD5X build: keep local device JSON persistence, but never mirror
+    // account-device state to Creality Cloud/OSS.
+    return;
+
     bool success = false;
     std::filesystem::path accout_device_file = (std::filesystem::path(get_local_device_dir()) / account_device_json_file()).make_preferred();
     std::string setting_id = m_account_device_file_id;

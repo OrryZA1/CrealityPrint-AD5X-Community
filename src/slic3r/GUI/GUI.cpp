@@ -654,72 +654,21 @@ std::string get_vertion_type()
 
 std::string get_cloud_api_url()
 {
-    std::string url;
-    std::string version_type = get_vertion_type();
-    std::string country_code = wxGetApp().app_config->get_country_code();
-    // 当 PROJECT_VERSION_EXTRA 为 Dev 时，云端交互统一指向 Dev 接口
-    {
-        std::string extra = std::string(PROJECT_VERSION_EXTRA);
-        if (boost::algorithm::iequals(extra, std::string("Dev"))) {
-            return "http://api-dev.crealitycloud.cn";
-        }
-    }
-    if (version_type == "Alpha") {
-        if (country_code == "CN") {
-            url = "https://admin-pre.crealitycloud.cn";
-        } else {
-            url = "https://admin-pre.crealitycloud.com";
-        }
-    } else {
-        if (country_code == "CN") {
-            url = "https://api.crealitycloud.cn";
-        } else {
-            url = "https://api.crealitycloud.com";
-        }
-    }
-    return url;
+    // Offline AD5X build: Creality Cloud API traffic is globally redirected
+    // to a local closed port. Printer LAN/Fluidd/Klipper traffic does not use
+    // this helper.
+    return "http://127.0.0.1:9";
 }
 std::string get_ai_creation_webaddress()
 {
-    // Local frontend debugging is opt-in and takes precedence over build/region.
-    wxString local_test;
-    if (wxGetEnv("CREALITY_AI_CREATION_LOCAL", &local_test) && local_test == "1")
-        return "http://172.21.10.169:9090/makenow/ModelingTools/Home";
-
-    // get_vertion_type() classifies both Dev and Alpha builds as Alpha.
-    if (get_vertion_type() == "Alpha")
-        return "https://makenow-dev.crealitycloud.cn/makenow/ModelingTools/Home";
-
-    return wxGetApp().app_config->get_country_code() == "CN"
-        ? "https://makenow.crealitycloud.cn/makenow/ModelingTools/Home"
-        : "https://makenow.crealitycloud.com/makenow/ModelingTools/Home";
+    // Offline AD5X build: AI Creation web UI is disabled.
+    return "http://127.0.0.1:9/";
 }
 
 std::string get_cloud_webaddress()
 {
-	std::string url;
-    std::string version_type = get_vertion_type();
-    std::string country_code = wxGetApp().app_config->get_country_code();
-    {
-        std::string extra = std::string(PROJECT_VERSION_EXTRA);
-        if (boost::algorithm::iequals(extra, std::string("Dev"))) {
-            return "https://dev2.crealitycloud.cn/";
-        }
-    }
-    if (version_type == "Alpha") {
-        if (country_code == "CN") {
-            url = "https://pre-2.crealitycloud.cn/";
-        } else {
-            url = "https://pre-2.crealitycloud.com/";
-        }
-    } else {
-        if (country_code == "CN") {
-            url = "https://cp.crealitycloud.cn/";
-        } else {
-            url = "https://cp.crealitycloud.com/";
-        }
-    }
-    return url;
+    // Offline AD5X build: Creality community/model web UI is disabled.
+    return "http://127.0.0.1:9/";
 }
 
 static std::string get_file_md5_streaming_impl(const std::string& path)

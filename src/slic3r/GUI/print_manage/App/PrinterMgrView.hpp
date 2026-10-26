@@ -142,7 +142,7 @@ namespace Slic3r {
             void scan_device(const std::string& request_id = {});
             void correct_device();
 
-            wxWebView* m_browser;
+            wxWebView* m_browser {nullptr};
             // Captured on the UI thread when m_browser is created. Background
             // workers only copy this POD snapshot; the UI thread still resolves
             // and validates the wxWindow before using it.

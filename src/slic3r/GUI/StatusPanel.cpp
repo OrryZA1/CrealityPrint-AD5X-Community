@@ -4612,25 +4612,8 @@ std::pair<wxStaticBitmap *, ScoreDialog::ImageMsg> ScoreDialog::create_oss_thumb
     wxStaticBitmap *imageCtrl = new wxStaticBitmap(this, wxID_ANY, wxBitmap(image.Rescale(FromDIP(80), FromDIP(60))), wxDefaultPosition, wxDefaultSize, 0);
     imageCtrl->Bind(wxEVT_LEFT_DOWN, &ScoreDialog::OnBitmapClicked, this);
 
-    Slic3r::Http http   = Slic3r::Http::get(oss_path);
-    std::string  suffix = oss_path.substr(oss_path.find_last_of(".") + 1);
-    http.header("accept", "image/" + suffix) //"image/" + suffix
-        .header("Accept-Encoding", "gzip")
-        .on_complete([this, imageCtrl, time = std::weak_ptr<int>(m_tocken)](std::string body, unsigned int status) {
-            if (time.expired()) return;
-            wxMemoryInputStream stream(body.data(), body.size());
-            wxImage             success_image;
-            if (success_image.LoadFile(stream, wxBITMAP_TYPE_ANY)) {
-                CallAfter([this, success_image, imageCtrl]() { update_static_bitmap(imageCtrl, success_image); });
-
-            } else {
-                CallAfter([this, imageCtrl]() { update_static_bitmap(imageCtrl, fail_image); });
-            }
-        })
-        .on_error([this, imageCtrl, &oss_path](std::string body, std::string error, unsigned status) {
-            BOOST_LOG_TRIVIAL(info) << "load oss picture failed, oss path: " << oss_path << " status:" << status << " error:" << error;
-            CallAfter([this, imageCtrl]() { update_static_bitmap(imageCtrl, fail_image); });
-        }).perform();
+    // Offline AD5X build: do not fetch remote OSS thumbnails.
+    update_static_bitmap(imageCtrl, fail_image);
 
     m_image_sizer->Add(create_broad_sizer(imageCtrl, cur_image_msg), 0, wxALL, 5);
 

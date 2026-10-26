@@ -5040,13 +5040,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         //         // On Windows and Linux needs focus in order to catch key events
         //  Set focus in order to remove it from sidebar fields
         if (m_canvas != nullptr) {
-            // Only set focus, if the top level window of this canvas is active.
-            auto p = dynamic_cast<wxWindow*>(evt.GetEventObject());
-            while (p->GetParent())
-                p = p->GetParent();
-            auto* top_level_wnd = dynamic_cast<wxTopLevelWindow*>(p);
-            if (top_level_wnd && top_level_wnd->IsActive() && !wxGetApp().get_side_menu_popup_status())
-                ; // m_canvas->SetFocus();
+            // Do not force canvas focus on mouse enter; preserve focus in sidebar fields.
             m_mouse.position  = pos.cast<double>();
             m_tooltip_enabled = false;
             // 1) forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
@@ -11507,7 +11501,7 @@ void GLCanvas3D::_render_overlays()
     m_labels.render(sorted_instances);
 
     _render_3d_navigator();
-    _render_ai_chat_toggle();
+    // AD5X UI: floating Little C AI Chat toggle hidden; other canvas rendering unchanged.
 }
 
 void GLCanvas3D::_render_style_editor()
@@ -12774,7 +12768,6 @@ void GLCanvas3D::_render_assemble_info() const
     auto          canvas_h    = float(get_canvas_size().get_height());
     float         space_size  = imgui->get_style_scaling() * 8.0f;
     float         caption_max = imgui->calc_text_size(_L("Total Volume:")).x + 3 * space_size;
-    char          buf[3][64];
 
     ImGuiIO& io        = ImGui::GetIO();
     ImFont*  font      = io.Fonts->Fonts[0];

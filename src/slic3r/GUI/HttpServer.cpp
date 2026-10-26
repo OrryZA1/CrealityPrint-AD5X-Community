@@ -856,6 +856,9 @@ std::shared_ptr<HttpServer::Response> HttpServer::creality_handle_request(const 
         currentPath = fs::temp_directory_path();
     }
     if(path.find("/login") == 0) {
+        // Offline AD5X build: Creality Cloud OAuth callback is disabled.
+        return std::make_shared<ResponseNotFound>();
+
         std::string   result_url = url_get_param(url, "result_url");
         std::string   code       = url_get_param(url, "code");
         std::string region = wxGetApp().app_config->get("region");

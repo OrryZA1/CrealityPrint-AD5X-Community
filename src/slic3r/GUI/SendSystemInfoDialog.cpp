@@ -701,6 +701,10 @@ void SendSystemInfoDialog::on_dpi_changed(const wxRect&)
 // This actually sends the info.
 bool SendSystemInfoDialog::send_info(wxString& message)
 {
+    // Offline AD5X build: system diagnostics are never uploaded.
+    message = _L("System information upload is disabled in this offline build.");
+    return false;
+
     std::atomic<int> job_done = false; // Flag to communicate between threads.
     struct Result {
         enum {

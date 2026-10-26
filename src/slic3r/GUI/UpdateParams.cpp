@@ -38,7 +38,9 @@ static std::string update_profile_name(const json& printer, const std::string& n
 
 int nsUpdateParams::CXCloud::getNeedUpdatePrintes(std::vector<std::string>& vtNeedUpdatePrinter)
 {
+    // Offline AD5X build: never query Creality Cloud for printer-profile versions.
     vtNeedUpdatePrinter.clear();
+    return 0;
 
     if (m_mapLocalPrinterVersion.empty()) {
         loadLocalPrinter();
@@ -187,6 +189,12 @@ UpdateParams& UpdateParams::getInstance()
 
 void UpdateParams::checkParamsNeedUpdate()
 {
+    // Offline AD5X build: bundled/local parameter packages are authoritative.
+    m_vtNeedUpdatePrinter.clear();
+    m_bHasUpdateParams = false;
+    closeParamsUpdateTip();
+    return;
+
     if (m_bHasUpdateParams) {
         m_CXCloud.clearLocalPrinter();
         m_vtNeedUpdatePrinter.clear();

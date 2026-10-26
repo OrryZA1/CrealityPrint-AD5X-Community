@@ -38,7 +38,9 @@ WebViewPanel::WebViewPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY, wxDefau
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " Address: " << (void*) this;
 
 #if CUSTOM_COMMUNITY_ENABLE
-    wxString url = GetURL();
+    // Offline AD5X build: keep the Home panel object for layout/API stability,
+    // but never navigate its WebView to the cloud-backed community homepage.
+    wxString url = wxEmptyString;
     wxBoxSizer* topsizer = new wxBoxSizer(wxVERTICAL);
 
 #if !BBL_RELEASE_TO_PUBLIC
@@ -335,6 +337,9 @@ WebViewPanel::~WebViewPanel()
 void WebViewPanel::Reload()
 {
 #if CUSTOM_COMMUNITY_ENABLE
+    // Offline AD5X build: hidden Home/community page is non-navigating.
+    return;
+
     void* backend_before = m_browser->GetNativeBackend();
     BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << "[LOAD_URL_ACTION] START. webView=" << (void*) m_browser
                                << ", Backend Ptr BEFORE: " << backend_before;
@@ -349,6 +354,10 @@ void WebViewPanel::Reload()
 void WebViewPanel::load_url(wxString& url)
 {
 #if CUSTOM_COMMUNITY_ENABLE
+    // Offline AD5X build: hidden Home/community page is non-navigating.
+    (void)url;
+    return;
+
     this->Show();
     this->Raise();
     m_url->SetLabelText(url);

@@ -1,0 +1,12 @@
+{
+    "type":  "machine_model",
+    "name":  "Flashforge AD5X",
+    "model_id":  "Flashforge-AD5X",
+    "nozzle_diameter":  "0.4",
+    "machine_tech":  "FFF",
+    "family":  "Flashforge",
+    "bed_model":  "flashforge_adventurer5m_series_buildplate_model.STL",
+    "bed_texture":  "flashforge_ad5x_buildplate_texture.png",
+    "hotend_model":  "flashforge_adventurer_5m_series_hotend.stl",
+    "default_materials":  "Flashforge AD5X Generic PLA;Flashforge AD5X Generic PLA+;Flashforge AD5X Generic PETG;Flashforge AD5X Generic ABS;Flashforge AD5X Generic ASA;Flashforge AD5X Generic TPU"
+}

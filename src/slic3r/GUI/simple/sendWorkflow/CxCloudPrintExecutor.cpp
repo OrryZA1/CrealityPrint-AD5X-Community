@@ -7,8 +7,6 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
-#include <ctime>
-#include <fstream>
 #include <thread>
 #include <utility>
 
@@ -32,6 +30,10 @@ std::string dump_json_for_log(const json& value)
     }
 }
 
+void append_cloud_executor_debug_log(const std::string& tag, const std::string& content)
+{
+    BOOST_LOG_TRIVIAL(debug) << "[" << tag << "] " << content;
+}
 
 std::string build_material_label(const CloudPrintMaterialItem& item)
 {
@@ -157,23 +159,10 @@ bool body_code_is_auth_failure(const json& body)
     return body.is_object() && body.contains("code") && body["code"].is_number_integer() && body["code"].get<int>() == 4;
 }
 
-void append_cloud_executor_debug_log(const std::string& tag, const std::string& content)
-{
-    std::ofstream log_file("D:/log.txt", std::ios::app);
-    if (!log_file.is_open())
-        return;
-
-    std::time_t now = std::time(nullptr);
-    char        buf[64];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-    log_file << "[" << buf << "][" << tag << "] " << content << "\n";
-}
-
 void log_cloud_executor_stage(const std::string& stage, const std::string& message)
 {
     const std::string full_message = "[CxCloudPrintExecutor] stage=" + stage + " " + message;
     BOOST_LOG_TRIVIAL(info) << full_message;
-    append_cloud_executor_debug_log("CxCloudPrintExecutor", full_message);
 }
 } // namespace
 
@@ -184,6 +173,12 @@ CxCloudPrintExecutor::CxCloudPrintExecutor(CxCloudPrintClient client)
 
 void CxCloudPrintExecutor::start(const CloudPrintRequest& request, Callbacks callbacks)
 {
+    // Offline AD5X build: cloud printing is disabled before any polling,
+    // parsing, logging, or network work can begin.
+    (void)request;
+    emit_error(callbacks, "offline_disabled", _u8L("Creality Cloud printing is disabled in this offline build"));
+    return;
+
     m_cancelled.store(false);
 
     log_cloud_executor_stage(

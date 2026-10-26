@@ -1,7 +1,7 @@
 {
   "provider": "squirrel.windows",
-  "channel": "stable",
-  "update_feed": "http://172.20.180.14/shared/crealityprint/windows",
+  "channel": "disabled",
+  "update_feed": "http://127.0.0.1:9/crealityprint-updates-disabled",
   "releases_file": "RELEASES",
   "bootstrapper": "CrealityPrintSetup.exe",
   "package_prefix": "CrealityPrint",

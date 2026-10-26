@@ -1,0 +1,14 @@
+{
+    "type":  "filament",
+    "name":  "Flashforge AD5X Generic PETG",
+    "from":  "system",
+    "setting_id":  "AD5X-PETG-01",
+    "instantiation":  "true",
+    "inherits":  "Flashforge Generic PETG",
+    "compatible_printers":  [
+                                "Flashforge AD5X 0.4 nozzle"
+                            ],
+    "filament_cooling_moves":  [
+                                   "0"
+                               ]
+}

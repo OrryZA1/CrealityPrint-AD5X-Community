@@ -24,6 +24,10 @@
     {
       "name": "Flashforge Guider 2s",
       "sub_path": "machine/Flashforge Guider 2s.json"
+    },
+    {
+      "name": "Flashforge AD5X",
+      "sub_path": "machine/Flashforge AD5X.json"
     }
   ],
   "process_list": [
@@ -106,6 +110,10 @@
     {
       "name": "0.12mm Detail @Flashforge Guider 2s 0.4 nozzle",
       "sub_path": "process/0.12mm Detail @Flashforge Guider 2s 0.4 nozzle.json"
+    },
+    {
+      "name": "0.20mm Standard @FF AD5X",
+      "sub_path": "process/0.20mm Standard @FF AD5X.json"
     }
   ],
   "filament_list": [
@@ -264,6 +272,30 @@
     {
       "name":"Flashforge Generic PVA",
       "sub_path":"filament/Flashforge Generic PVA.json"
+    },
+    {
+      "name": "Flashforge AD5X Generic PLA",
+      "sub_path": "filament/Flashforge AD5X Generic PLA.json"
+    },
+    {
+      "name": "Flashforge AD5X Generic PLA+",
+      "sub_path": "filament/Flashforge AD5X Generic PLA+.json"
+    },
+    {
+      "name": "Flashforge AD5X Generic PETG",
+      "sub_path": "filament/Flashforge AD5X Generic PETG.json"
+    },
+    {
+      "name": "Flashforge AD5X Generic ABS",
+      "sub_path": "filament/Flashforge AD5X Generic ABS.json"
+    },
+    {
+      "name": "Flashforge AD5X Generic ASA",
+      "sub_path": "filament/Flashforge AD5X Generic ASA.json"
+    },
+    {
+      "name": "Flashforge AD5X Generic TPU",
+      "sub_path": "filament/Flashforge AD5X Generic TPU.json"
     }
   ],
   "machine_list": [
@@ -334,6 +366,10 @@
     {
       "name": "Flashforge Guider 2s 0.4 nozzle",
       "sub_path": "machine/Flashforge Guider 2s 0.4 nozzle.json"
+    },
+    {
+      "name": "Flashforge AD5X 0.4 nozzle",
+      "sub_path": "machine/Flashforge AD5X 0.4 nozzle.json"
     }
   ]
 }

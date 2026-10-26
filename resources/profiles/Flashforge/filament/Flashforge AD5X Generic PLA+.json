@@ -1,0 +1,14 @@
+{
+    "type":  "filament",
+    "name":  "Flashforge AD5X Generic PLA+",
+    "from":  "system",
+    "setting_id":  "AD5X-PLAP-01",
+    "instantiation":  "true",
+    "inherits":  "Flashforge Generic PLA",
+    "compatible_printers":  [
+                                "Flashforge AD5X 0.4 nozzle"
+                            ],
+    "filament_cooling_moves":  [
+                                   "0"
+                               ]
+}

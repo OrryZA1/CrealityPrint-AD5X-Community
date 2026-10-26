@@ -7,8 +7,6 @@
 #include <boost/log/trivial.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <ctime>
-#include <fstream>
 
 namespace Slic3r {
 namespace GUI {
@@ -65,14 +63,7 @@ std::string json_error_message(const json& body, unsigned http_status)
 
 void append_cloud_client_debug_log(const std::string& tag, const std::string& content)
 {
-    std::ofstream log_file("D:/log.txt", std::ios::app);
-    if (!log_file.is_open())
-        return;
-
-    std::time_t now = std::time(nullptr);
-    char        buf[64];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-    log_file << "[" << buf << "][" << tag << "] " << content << "\n";
+    BOOST_LOG_TRIVIAL(debug) << "[" << tag << "] " << content;
 }
 
 } // namespace
@@ -152,7 +143,15 @@ CxCloudPrintClient::Result CxCloudPrintClient::post_json(const std::string& path
                                                          long connect_timeout,
                                                          long max_timeout) const
 {
+    // Offline AD5X build: all cloud-print HTTP requests fail closed here.
+    (void)path;
+    (void)payload;
+    (void)connect_timeout;
+    (void)max_timeout;
     Result result;
+    result.error = "Creality Cloud printing is disabled in this offline build";
+    return result;
+
     const std::string url = build_base_url() + path;
 
     BOOST_LOG_TRIVIAL(info)

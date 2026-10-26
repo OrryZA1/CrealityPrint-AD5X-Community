@@ -83,10 +83,10 @@
 #ifdef _WIN32
 #include <boost/algorithm/hex.hpp>
 #include <boost/uuid/detail/md5.hpp>
-#endif
-
-#ifndef _WIN32
+#include <direct.h>
+#else
 #include <sys/statvfs.h>
+#include <unistd.h>
 #endif
 
 #include "slic3r/GUI/MsgDialog.hpp"
@@ -889,6 +889,12 @@ void GUI_App::schedule_software_launch_analytics()
         return;
     if (!is_privacy_checked())
         return;
+
+    // Offline AD5X build: preserve local launch-info initialization, but do not
+    // schedule background analytics/OTA reporting work.
+    check_app_first_launch_info();
+    m_app_launch_initialized = true;
+    return;
 
     wxTimer* timer = new wxTimer();
     timer->Bind(wxEVT_TIMER, [this, timer](wxTimerEvent&) {
@@ -2180,8 +2186,7 @@ void GUI_App::post_init()
         const auto first_url = this->init_params->input_files.front();
         if (this->init_params->input_files.size() == 1 && is_supported_open_protocol(first_url)) {
             switch_to_3d = true;
-            std::cout << "first_url: " << first_url << std::endl;
-            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << first_url << "\n";
+            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": supported open-protocol URL received";
             start_download(first_url);
             m_openlink_url = first_url;
             m_open_method = "url";
@@ -2514,6 +2519,8 @@ void GUI_App::post_init()
                    std::time_t lw_t = boost::filesystem::last_write_time(temp_path) ;
                    files_vec.push_back({ lw_t, temp_path.filename().string() });
                } catch (const std::exception &ex) {
+                   BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": unable to read log timestamp for "
+                                              << temp_path.string() << ": " << ex.what();
                }
            }
            std::sort(files_vec.begin(), files_vec.end(), [](
@@ -2535,10 +2542,8 @@ void GUI_App::post_init()
         }
     }
     BOOST_LOG_TRIVIAL(info) << "finished post_init";
-    if (m_satisfaction_survey_manager) {
-        m_satisfaction_survey_manager->begin_startup_check();
-        m_satisfaction_survey_manager->notify_post_init_finished(mainframe);
-    }
+    // Offline AD5X build: keep local survey state/event integration available,
+    // but do not fetch remote survey configuration or start survey polling at startup.
     
 //BBS: remove the single instance currently
 #ifdef _WIN32
@@ -2675,53 +2680,17 @@ bool GUI_App::can_show_satisfaction_survey() const
 
 std::string GUI_App::get_http_url(std::string country_code, std::string path)
 {
-    std::string url;
-    if (country_code == "US") {
-        url = "https://api.bambulab.com/";
-    }
-    else if (country_code == "CN") {
-        url = "https://api.bambulab.cn/";
-    }
-    else if (country_code == "ENV_CN_DEV") {
-        url = "https://api-dev.bambu-lab.com/";
-    }
-    else if (country_code == "ENV_CN_QA") {
-        url = "https://api-qa.bambu-lab.com/";
-    }
-    else if (country_code == "ENV_CN_PRE") {
-        url = "https://api-pre.bambu-lab.com/";
-    }
-    else {
-        url = "https://api.bambulab.com/";
-    }
-
-    url += path.empty() ? "v1/iot-service/api/slicer/resource" : path;
-    return url;
+    // Offline AD5X build: legacy Bambu/Orca cloud API helpers are disabled.
+    (void)country_code;
+    (void)path;
+    return "http://127.0.0.1:9/";
 }
 
 std::string GUI_App::get_model_http_url(std::string country_code)
 {
-    std::string url;
-    if (country_code == "US") {
-        url = "https://makerworld.com/";
-    }
-    else if (country_code == "CN") {
-        url = "https://makerworld.com/";
-    }
-    else if (country_code == "ENV_CN_DEV") {
-        url = "https://makerhub-dev.bambu-lab.com/";
-    }
-    else if (country_code == "ENV_CN_QA") {
-        url = "https://makerhub-qa.bambu-lab.com/";
-    }
-    else if (country_code == "ENV_CN_PRE") {
-        url = "https://makerhub-pre.bambu-lab.com/";
-    }
-    else {
-        url = "https://makerworld.com/";
-    }
-
-    return url;
+    // Offline AD5X build: legacy model-library cloud helper is disabled.
+    (void)country_code;
+    return "http://127.0.0.1:9/";
 }
 
 
@@ -2755,6 +2724,13 @@ static std::string decode(std::string const& extra, std::string const& path = {}
 
 int GUI_App::download_plugin(std::string name, std::string package_name, InstallProgressFn pro_fn, WasCancelledFn cancel_fn)
 {
+    // Offline AD5X build: remote network/plugin downloads are disabled.
+    (void)name;
+    (void)package_name;
+    (void)pro_fn;
+    (void)cancel_fn;
+    return -1;
+
     int result = 0;
     json j;
     std::string err_msg;
@@ -3596,7 +3572,12 @@ void GUI_App::init_app_config()
             throw DataMigration::Error(error.what());
         }
         fs::create_directories(fs::path(Slic3r::data_dir()) / "log");
-        chdir(encode_path((Slic3r::data_dir() + "/log").c_str()).c_str());
+        const std::string log_dir = encode_path((Slic3r::data_dir() + "/log").c_str());
+#ifdef _WIN32
+        _chdir(log_dir.c_str());
+#else
+        chdir(log_dir.c_str());
+#endif
     } else {
         // Explicit --datadir keeps its existing behavior and never imports another installation.
         m_datadir_redefined = true;
@@ -5006,6 +4987,7 @@ bool GUI_App::on_init_inner(bool isdump_launcher)
             init_params->preset_substitutions = preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
         }catch(ConfigurationError &ex)
         {
+            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": configuration error while loading presets: " << ex.what();
             int ret = wxMessageBox(_L("Detected corruption in the Creality Print configuration file, attempted to rebuild, \nplease manually restart the software."), _L("Error"), wxOK | wxICON_ERROR);
             if(ret == wxOK) {
                 boost::filesystem::path dir = (boost::filesystem::path(data_dir()) / PRESET_SYSTEM_DIR).make_preferred();
@@ -5191,8 +5173,8 @@ bool GUI_App::on_init_inner(bool isdump_launcher)
         RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 #endif
     BOOST_LOG_TRIVIAL(info) << "main frame firstly shown";
-    start_async_material_list_update();
-    OfficialMaterialColors::refresh_async();
+    // Offline AD5X build: keep bundled/cached material data; do not refresh
+    // official material lists or color spectra from Creality Cloud at startup.
 
     // 启动用户信息文件监听，确保跨实例同步在线模型库登录状态
     start_user_info_watcher();
@@ -5337,6 +5319,11 @@ void  GUI_App::on_init_custom_config()
 }
 void  GUI_App::track_event(const std::string& event, const std::string& data)
 {
+    // Offline AD5X build: telemetry/event forwarding is disabled.
+    (void)event;
+    (void)data;
+    return;
+
     // Analytics may be delivered by timers that were queued before shutdown.
     // Never forward them to the main frame after its WebView children start
     // being destroyed.
@@ -5949,20 +5936,7 @@ void GUI_App::set_side_menu_popup_status(bool status)
 
 void GUI_App::link_to_network_check()
 {
-    std::string url;
-    std::string country_code = app_config->get_country_code();
-
-
-    if (country_code == "US") {
-        url = "https://status.bambulab.com";
-    }
-    else if (country_code == "CN") {
-        url = "https://status.bambulab.cn";
-    }
-    else {
-        url = "https://status.bambulab.com";
-    }
-    wxLaunchDefaultBrowser(url);
+    // Offline AD5X build: public network-status page is disabled.
 }
 
 void GUI_App::webGetDevicesInfo(json& result)
@@ -6279,8 +6253,8 @@ if (res) {
             mainframe->refresh_plugin_tips();
             // BBS: remove SLA related message
         }
-    } catch (std::exception &e) {
-        // wxMessageBox(e.what(), "", MB_OK);
+    } catch (const std::exception &e) {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": user guide failed: " << e.what();
     }
 }
 
@@ -6293,13 +6267,18 @@ void GUI_App::ShowDownNetPluginDlg() {
             return;
         DownloadProgressDialog dlg(_L("Downloading Bambu Network Plug-in"));
         dlg.ShowModal();
-    } catch (std::exception &e) {
-        ;
+    } catch (const std::exception &e) {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": network plug-in dialog failed: " << e.what();
     }
 }
 
 void GUI_App::ShowUserLogin(bool show,const wxString& loginUrl)
 {
+    // Offline AD5X build: Creality Cloud account login UI is disabled.
+    (void)show;
+    (void)loginUrl;
+    return;
+
 #if 0
         // BBS: User Login Dialog
     if (show) {
@@ -6340,8 +6319,8 @@ void GUI_App::ShowUserLogin(bool show,const wxString& loginUrl)
                     m_login_dialog = nullptr;
                 }
             });
-        } catch (std::exception &e) {
-            ;
+        } catch (const std::exception &e) {
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": login dialog scheduling failed: " << e.what();
         }
     }
 #endif
@@ -6361,8 +6340,8 @@ void GUI_App::ShowOnlyFilament() {
 
             // BBS: remove SLA related message
         }
-    } catch (std::exception &e) {
-        // wxMessageBox(e.what(), "", MB_OK);
+    } catch (const std::exception &e) {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": filament guide failed: " << e.what();
     }
 }
 
@@ -6686,6 +6665,9 @@ int GUI_App::request_user_unbind(std::string dev_id)
 }
 void GUI_App::start_async_material_list_update()
 {
+    // Offline AD5X build: bundled/cached material catalogue is authoritative.
+    return;
+
     bool expected = false;
     if (!g_async_material_list_update_running.compare_exchange_strong(expected, true))
         return;
@@ -6709,6 +6691,9 @@ void GUI_App::start_async_material_list_update()
 }
 void GUI_App::refresh_machine_list_for_region()
 {
+    // Offline AD5X build: retain the bundled/cached machine catalogue.
+    return;
+
     bool expected = false;
     if (!g_async_machine_list_refresh_running.compare_exchange_strong(expected, true))
         return;
@@ -6732,6 +6717,9 @@ void GUI_App::refresh_machine_list_for_region()
 }
 bool GUI_App::check_machine_list()
 {
+    // Offline AD5X build: do not refresh machine/material catalogues from cloud.
+    return false;
+
 #ifdef WIN32    
     if(single_instance_checker()->IsAnotherRunning())
     {
@@ -7775,6 +7763,7 @@ bool UpdateParamPackage(pt::ptree v,json& profile_json,json& cache_json,json& ma
                 }
         }catch(const std::exception& e)
         {
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": failed to update cached printer profile state: " << e.what();
             return false;
         }
         return true;
@@ -7789,9 +7778,9 @@ void  GUI_App::init_user_profile()
             boost::nowide::ifstream ifs(user_file.string());
             ifs >> j;
         }catch (const std::exception& e) {
+            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(", parse json failed, %1%.") % e.what();
             fs::remove(user_file);
             return;
-            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(",  parse json failed, %1%.") % e.what();
         }
     }else{
         return;
@@ -8015,6 +8004,30 @@ std::string GUI_App::handle_web_request(std::string cmd)
 
         if (command.has_value()) {
             std::string command_str = command.value();
+
+            // Offline AD5X build: fail closed for cloud/account/remote-download
+            // commands while preserving local project, preset, mDNS and Device flows.
+            if (command_str == "request_project_download" ||
+                command_str == "trigger_login_check" ||
+                command_str == "get_login_info" ||
+                command_str == "homepage_login_or_register" ||
+                command_str == "homepage_modeldepot" ||
+                command_str == "get_account_info" ||
+                command_str == "login_account_success" ||
+                command_str == "update_account_info" ||
+                command_str == "homepage_open_hotspot" ||
+                command_str == "userguide_wiki_open" ||
+                command_str == "common_openurl" ||
+                command_str == "makerworld_model_open" ||
+                command_str == "makerworld_model_list_open" ||
+                command_str == "models_download_start" ||
+                command_str == "3mf_download_start" ||
+                command_str == "send_http_request" ||
+                command_str == "update_preset_params" ||
+                command_str == "begin_network_plugin_download") {
+                return "";
+            }
+
             if (command_str.compare("request_project_download") == 0) {
                 if (root.get_child_optional("data") != boost::none) {
                     pt::ptree data_node = root.get_child("data");
@@ -8343,16 +8356,17 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 }
             }
             else if (command_str.compare("common_openurl") == 0) {
-                boost::optional<std::string> path      = root.get_optional<std::string>("url");
-                if (path.has_value()) {
-                    wxLaunchDefaultBrowser(path.value());
-                }
+                // Offline AD5X build: embedded web content may not launch arbitrary URLs.
+                return "";
             } 
             else if (command_str.compare("homepage_makerlab_get") == 0) {
                 //if (mainframe->m_webview) { mainframe->m_webview->SendMakerlabList(); }
             }
             else if (command_str.compare("makerworld_model_open") == 0) 
             {
+                // Offline AD5X build: online model-library navigation is disabled.
+                return "";
+
                 if (root.get_child_optional("model") != boost::none) {
                     pt::ptree                    data_node = root.get_child("model");
                     boost::optional<std::string> path      = data_node.get_optional<std::string>("url");
@@ -8364,6 +8378,9 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 }
             }
             else if (command_str.compare("makerworld_model_list_open") == 0) {
+                // Offline AD5X build: online model-library navigation is disabled.
+                return "";
+
                 if (root.get_child_optional("model") != boost::none) {
                     pt::ptree data_node = root.get_child("model.url");
                     for (auto& v : data_node) {
@@ -8373,6 +8390,9 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 }
             }
             else if (command_str.compare("models_download_start") == 0) {
+                // Offline AD5X build: remote model downloads are disabled.
+                return "";
+
                 std::string userId = root.get_child("userId").data();
                 if (model_downloaders_.find(userId) == model_downloaders_.cend()) {
                     model_downloaders_.emplace(userId, std::make_unique<ModelDownloader>(userId));
@@ -8392,6 +8412,9 @@ std::string GUI_App::handle_web_request(std::string cmd)
             }
 
             else if (command_str.compare("3mf_download_start") == 0) {
+                // Offline AD5X build: remote 3MF downloads are disabled.
+                return "";
+
                 std::string userId = root.get_child("userId").data();
                 if (model_downloaders_.find(userId) == model_downloaders_.cend()) {
                     model_downloaders_.emplace(userId, std::make_unique<ModelDownloader>(userId));
@@ -8599,6 +8622,9 @@ std::string GUI_App::handle_web_request(std::string cmd)
                     m_user_query_type = 1;
                 return "";
             } else if (command_str.compare("send_http_request") == 0) {
+                // Offline AD5X build: web/bridge layers may not proxy arbitrary HTTP.
+                return "";
+
                 pt::ptree info_node = root.get_child("info");
 
                 std::string base_url = info_node.get_child("urlEncoded").data();
@@ -8651,6 +8677,9 @@ std::string GUI_App::handle_web_request(std::string cmd)
 
                 return "";
             } else if (command_str.compare("update_preset_params") == 0) {
+                // Offline AD5X build: remote preset/material refresh is disabled.
+                return "";
+
                 pt::ptree data_node = root.get_child("data");
                 auto filament_file = fs::path(data_dir()).append("system").append("Creality").append("materialList.json");
                 
@@ -9057,20 +9086,16 @@ std::string GUI_App::handle_web_request(std::string cmd)
                 };
                 auto Loc_GetMaterials = [](const std::string& materials) {
                     std::vector<std::string> results;
-                    int                      idx = 0;
-                    while (idx != std::string::npos && idx < materials.size()) {
-                        int index = materials.find(';', idx);
-                        if (idx < index) {
-                            std::string nozzle = materials.substr(idx, index - idx);
-                            results.emplace_back(nozzle);
-                            idx = index + 1;
-                        } else if (index == std::string::npos) {
-                            std::string nozzle = materials.substr(idx);
-                            results.emplace_back(nozzle);
-                            idx = index;
-                        } else {
-                            idx = std::string::npos;
+                    std::string::size_type idx = 0;
+                    while (idx < materials.size()) {
+                        const std::string::size_type index = materials.find(';', idx);
+                        if (index == std::string::npos) {
+                            results.emplace_back(materials.substr(idx));
+                            break;
                         }
+                        if (idx < index)
+                            results.emplace_back(materials.substr(idx, index - idx));
+                        idx = index + 1;
                     }
                     return results;
                 };
@@ -9427,9 +9452,8 @@ void GUI_App::download_project(std::string project_id)
 
 void GUI_App::request_project_download(std::string project_id)
 {
-    if (!check_login()) return;
-
-    download_project(project_id);
+    // Offline AD5X build: remote project downloads are disabled.
+    (void)project_id;
 }
 
 void GUI_App::request_open_project(std::string project_id)
@@ -9550,6 +9574,10 @@ void GUI_App::on_update_machine_list(wxCommandEvent &evt)
 
 void GUI_App::on_user_login_handle(wxCommandEvent &evt)
 {
+    // Offline AD5X build: Creality Cloud account connection is disabled.
+    (void)evt;
+    return;
+
     if (!m_agent) { return; }
 
     int online_login = evt.GetInt();
@@ -9617,6 +9645,10 @@ void GUI_App::process_msg_loop()
 
 void GUI_App::check_update(bool show_tips, int by_user)
 {
+    // AD5X 7.3 production freeze: block in-app software update checks.
+    (void)show_tips; (void)by_user;
+    return;
+
 #if defined(CREALITYPRINT_APP_STORE) && defined(__WXOSX__)
     (void)show_tips;
     (void)by_user;
@@ -9648,6 +9680,10 @@ void GUI_App::check_update(bool show_tips, int by_user)
 
 void GUI_App::check_new_version_local(bool show_tips, int by_user)
 {
+    // AD5X 7.3 production freeze: block in-app software update checks.
+    (void)show_tips; (void)by_user;
+    return;
+
 #ifdef __WXMSW__
     // 从配置文件读取updater_server_ip，如果没有配置则使用localhost:9000
     std::string updater_server_ip = app_config->get("updater_server_ip");
@@ -9843,6 +9879,11 @@ void GUI_App::trigger_deferred_restore_project()
 
 void GUI_App::check_new_version(bool show_tips, int by_user)
 {
+    // AD5X 7.3 production freeze: block in-app software update checks.
+    (void)show_tips; (void)by_user;
+    CallAfter([this]() { this->trigger_deferred_restore_project(); });
+    return;
+
 #if defined(CREALITYPRINT_APP_STORE) && defined(__WXOSX__)
     (void)show_tips;
     (void)by_user;
@@ -9922,6 +9963,11 @@ Semver get_version(const std::string& str, const std::regex& regexp) {
 }
 void GUI_App::check_new_version_cx(bool show_tips, int by_user)
 {
+    // AD5X 7.3 production freeze: block in-app software update checks.
+    (void)show_tips; (void)by_user;
+    CallAfter([this]() { this->trigger_deferred_restore_project(); });
+    return;
+
 #if defined(CREALITYPRINT_APP_STORE) && defined(__WXOSX__)
     (void)show_tips;
     (void)by_user;
@@ -10035,6 +10081,12 @@ void GUI_App::check_new_version_cx(bool show_tips, int by_user)
 
 void GUI_App::check_new_version_cx_updated(bool show_tips, int by_user)
 {
+    // AD5X 7.3 production freeze: no app update checks; preserve project restoration.
+    (void)show_tips; (void)by_user;
+    m_startup_update_check_running.store(false, std::memory_order_release);
+    CallAfter([this]() { this->trigger_deferred_restore_project(); });
+    return;
+
     const bool automatic_startup_check = !show_tips && by_user == 0;
 
     // Convert version to 3-part format for compatibility
@@ -10442,6 +10494,10 @@ void GUI_App::process_update_packages(const std::vector<PackageInfo>& updater_pa
 }
 void GUI_App::check_new_version_sf(bool show_tips, int by_user)
 {
+    // AD5X 7.3 production freeze: block in-app software update checks.
+    (void)show_tips; (void)by_user;
+    return;
+
 #if defined(CREALITYPRINT_APP_STORE) && defined(__WXOSX__)
     (void)show_tips;
     (void)by_user;
@@ -10612,19 +10668,6 @@ void GUI_App::show_check_privacy_dlg(wxCommandEvent& evt)
 
         reload_homepage();
 
-        CallAfter([this] {
-            wxTimer* upload_timer = new wxTimer();
-            upload_timer->Bind(wxEVT_TIMER, [upload_timer](wxTimerEvent&) {
-                AnalyticsDataUploadManager::getInstance().triggerUploadTasks(AnalyticsUploadTiming::ON_FIRST_LAUNCH, { AnalyticsDataEventType::ANALYTICS_FIRST_LAUNCH });
-                AnalyticsEventPayload payload;
-                payload.type = AnalyticsDataEventType::ANALYTICS_FIRST_LAUNCH;
-                AnalyticsDataUploadManager::getInstance().triggerUploadTasksWithPayload(payload);
-                upload_timer->Stop();
-                delete upload_timer;
-            });
-            upload_timer->StartOnce(3000);
-        });
-
         });
     privacy_dlg.Bind(EVT_PRIVACY_UPDATE_CANCEL, [this](wxCommandEvent &e) {
             std::string version = std::string(CREALITYPRINT_VERSION);
@@ -10778,6 +10821,10 @@ void GUI_App::on_check_privacy_update(wxCommandEvent& evt)
 
 void GUI_App::check_privacy_version(int online_login)
 {
+    // Offline AD5X build: remote privacy-policy checks are disabled.
+    (void)online_login;
+    return;
+
     update_http_extra_header();
     std::string query_params = "?policy/privacy=00.00.00.00";
     std::string url = get_http_url(app_config->get_country_code()) + query_params;
@@ -10855,7 +10902,6 @@ void GUI_App::check_creality_privacy_version(bool bShowDlg)
     if (!boost::filesystem::exists(device_file)) {
         
         std::string    res = app_config->get("is_first_install");
-        std::cout<<"is_first_install"<<res<<bShowDlg<<std::endl;
         if (res == "1" && !bShowDlg)
             bShowDlg = true;
         else
@@ -11303,6 +11349,10 @@ void GUI_App::remove_user_presets()
 
 void GUI_App::sync_preset(Preset* preset)
 {
+    // Offline AD5X build: never upload user presets to Creality Cloud/OSS.
+    (void)preset;
+    return;
+
     int result = -1;
     unsigned int http_code = 200;
     std::string updated_info;
@@ -11589,10 +11639,10 @@ bool GUI_App::wait_cloud_token()
     int wait_time = 160; // 16s
     while(token== app_config->get("cloud", "token"))
     {
-        std::cout <<"token" <<app_config->get("cloud", "token")<< std::endl;
         boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
         wait_time--;
-         if (wait_time <= 0) {
+        if (wait_time <= 0) {
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": cloud token did not change before timeout";
             return false;
         }
     }
@@ -11678,6 +11728,10 @@ void GUI_App::save_user_default_filaments(AppConfig *new_app_config)
 }
 void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 {
+    // Offline AD5X build: legacy Creality Cloud user-preset sync is disabled.
+    (void)with_progress_dlg;
+    return;
+
     if (!is_login()) {
         BOOST_LOG_TRIVIAL(error) << "start_sync_user_preset login is false";
         return;
@@ -12697,8 +12751,9 @@ void  GUI_App::show_ip_address_enter_dialog_handler(wxCommandEvent& evt)
 //}
 
 void GUI_App::open_upload_3mf(size_t open_on_tab, const std::string& highlight_option) {
-    Upload3mfToCloudDialog dlg(nullptr);
-    dlg.ShowModal();
+    // Offline AD5X build: Creality Cloud project upload is disabled.
+    (void)open_on_tab;
+    (void)highlight_option;
 }
     
 void GUI_App::open_preferences(size_t open_on_tab, const std::string& highlight_option)
@@ -14073,7 +14128,7 @@ static bool set_into_win_registry(HKEY hkeyHive, const wchar_t* pszVar, const wc
     }
 
     DWORD dwDisposition;
-    HKEY hkey;
+    HKEY hkey = nullptr;
     iRC = ::RegCreateKeyExW(hkeyHive, pszVar, 0, 0, 0, KEY_ALL_ACCESS, nullptr, &hkey, &dwDisposition);
     bool ret = false;
     if (iRC == ERROR_SUCCESS) {
@@ -14082,7 +14137,8 @@ static bool set_into_win_registry(HKEY hkeyHive, const wchar_t* pszVar, const wc
             ret = true;
     }
 
-    RegCloseKey(hkey);
+    if (hkey != nullptr)
+        ::RegCloseKey(hkey);
     return ret;
 }
 
@@ -14100,9 +14156,7 @@ static bool del_win_registry(HKEY hkeyHive, const wchar_t *pszVar, const wchar_t
         return false;
 
     if (!bDidntExist) {
-        DWORD dwDisposition;
-        HKEY  hkey;
-        iRC      = ::RegDeleteKeyExW(hkeyHive, pszVar, KEY_ALL_ACCESS, 0);
+        iRC = ::RegDeleteKeyExW(hkeyHive, pszVar, KEY_ALL_ACCESS, 0);
         if (iRC == ERROR_SUCCESS) {
             return true;
         }
@@ -14235,7 +14289,6 @@ void GUI_App::disassociate_url(std::wstring url_prefix)
 
 void GUI_App::start_download(std::string url)
 {
-    std::cout << "start_download: "<<url;
     if (!plater_) {
         BOOST_LOG_TRIVIAL(error) << "Could not start URL download: plater is nullptr.";
         return;
@@ -14385,6 +14438,10 @@ int GUI_App::load_machine_preset_data()
             return -1;
         }
     } else {
+        // Offline AD5X build: no cloud fallback when local machineList.json is absent.
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": local machineList.json not found; cloud fallback disabled";
+        return -1;
+
         auto        printer_list_file     = fs::path(data_dir()).append("system").append("Creality").append("machineList.json").string();
         std::string base_url              = get_cloud_api_url();
         auto        preupload_profile_url = "/api/cxy/v2/slice/profile/official/printerList";
@@ -14526,6 +14583,12 @@ void GUI_App::on_interinstance_message(const std::string& msg)
 } //Slic3r
 void GUI_App::OpenEshopRecommendedGoods(const std::string& materialColor, const std::string& materialType, const std::string& materialName)
 {
+    // Offline AD5X build: e-shop recommendations and tracking are disabled.
+    (void)materialColor;
+    (void)materialType;
+    (void)materialName;
+    return;
+
     using nlohmann::json;
     // Region code (used for site and CN shortcut)
     std::string country_code;

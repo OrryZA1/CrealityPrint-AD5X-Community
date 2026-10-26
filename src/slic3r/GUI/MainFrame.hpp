@@ -33,6 +33,8 @@ class SideButton;
 class Notebook;
 class wxBookCtrlBase;
 class wxProgressDialog;
+class wxPanel;
+class wxWebView;
 
 namespace Slic3r {
 
@@ -217,6 +219,7 @@ public:
         toDebugTool     = 9,
         tpDeviceMgr     = 10,
         tpAICreation    = 11,
+        tpAD5XDesign   = 12,
     };
 
     //BBS: add slice&&print status update logic
@@ -414,6 +417,9 @@ public:
     PrinterMgrView*       m_printer_mgr_view{nullptr};
     WebModelLibraryView*  m_webmodellibrary_view{ nullptr };
     WebModelLibraryView*  m_ai_creation_view{ nullptr };
+    wxPanel*              m_ad5x_design_page{ nullptr };
+    wxWebView*            m_ad5x_design_browser{ nullptr };
+    bool                  m_ad5x_design_loaded{ false };
     wxLogWindow*          m_log_window { nullptr };
     // BBS
     //wxBookCtrlBase*       m_tabpanel { nullptr };

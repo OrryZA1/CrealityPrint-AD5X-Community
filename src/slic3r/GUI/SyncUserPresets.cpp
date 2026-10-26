@@ -23,35 +23,7 @@ SyncUserPresets& SyncUserPresets::getInstance()
 
 int SyncUserPresets::startup()
 {
-    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets startup";
-    if (m_bRunning.load()) {
-        return 1;
-    }
-    m_bStoped.store(false);
-    m_bRunning.store(true);
-    if (m_thread.joinable()) {
-        m_thread.join();
-    }
-    m_thread = std::thread([this] {
-        try {
-            onRun();
-        } catch (const std::exception& e) {
-            BOOST_LOG_TRIVIAL(error) << "SyncUserPresets worker exception: " << e.what();
-            CXCloudDataCenter::getInstance().setDownloadPresetState(ENDownloadPresetState::ENDPS_DOWNLOAD_FAILED);
-            flush_logs();
-        } catch (...) {
-            BOOST_LOG_TRIVIAL(error) << "SyncUserPresets worker unknown exception";
-            CXCloudDataCenter::getInstance().setDownloadPresetState(ENDownloadPresetState::ENDPS_DOWNLOAD_FAILED);
-            flush_logs();
-        }
-        // Publish completion under the same mutex used by shutdown's waiter.
-        {
-            std::lock_guard<std::mutex> lock(m_mutexQuit);
-            m_bRunning.store(false);
-            m_bStoped.store(true);
-        }
-        m_cvQuit.notify_one();
-    });
+    // Offline AD5X build: do not start the Creality Cloud preset-sync worker.
     return 0;
 }
 
@@ -72,10 +44,7 @@ void SyncUserPresets::shutdown()
 }
 void SyncUserPresets::startSync() // 同步工作的启动
 {
-    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets startSync";
-    CXCloudDataCenter::getInstance().updateCXCloutLoginInfo(GUI::wxGetApp().app_config->get("cloud", "user_id"),
-                                                            GUI::wxGetApp().app_config->get("cloud", "token"));
-    m_bSync.store(true);
+    // Offline AD5X build: cloud preset synchronization is disabled.
 }
 void SyncUserPresets::stopSync() // 同步工作的不启动
 {
@@ -85,44 +54,22 @@ void SyncUserPresets::stopSync() // 同步工作的不启动
 
 void SyncUserPresets::syncUserPresetsToLocal()
 {
-    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets syncUserPresetsToLocal";
-    m_mutexLstSyncCmd.lock();
-    if (std::find(m_lstSyncCmd.begin(), m_lstSyncCmd.end(), ENSyncCmd::ENSC_SYNC_TO_LOCAL) == m_lstSyncCmd.end()
-        && !m_bHasSyncToLocal) {
-        m_lstSyncCmd.push_back(ENSyncCmd::ENSC_SYNC_TO_LOCAL);
-        m_bHasSyncToLocal = true;
-    }
-    m_mutexLstSyncCmd.unlock();
+    // Offline AD5X build: cloud preset synchronization is disabled.
 }
 
 void SyncUserPresets::syncUserPresetsToCXCloud()
 {
-    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets syncUserPresetsToCXCloud";
-    m_mutexLstSyncCmd.lock();
-    m_lstSyncCmd.push_back(ENSyncCmd::ENSC_SYNC_TO_CXCLOUD_CREATE);
-    m_mutexLstSyncCmd.unlock();
+    // Offline AD5X build: cloud preset synchronization is disabled.
 }
 
 void SyncUserPresets::syncUserPresetsToFrontPage()
 {
-    BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets syncUserPresetsToFrontPage" ;
-    std::lock_guard<std::mutex> lock(m_mutexLstSyncCmd);
-    // A refreshed page needs a new response even if the previous request is
-    // still being processed. Only coalesce requests that are still queued.
-    if (std::find(m_lstSyncCmd.begin(), m_lstSyncCmd.end(), ENSyncCmd::ENSC_SYNC_TO_FRONT_PAGE) == m_lstSyncCmd.end()) {
-        m_lstSyncCmd.push_back(ENSyncCmd::ENSC_SYNC_TO_FRONT_PAGE);
-    } else {
-        BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets has found syncUserPresetsToFrontPage";
-    }
+    // Offline AD5X build: cloud preset synchronization is disabled.
 }
 
 void SyncUserPresets::syncConfigToCXCloud()
 {
-    m_mutexLstSyncCmd.lock();
-    if (std::find(m_lstSyncCmd.begin(), m_lstSyncCmd.end(), ENSyncCmd::ENSC_SYNC_CONFIG_TO_CXCLOUD) == m_lstSyncCmd.end()) {
-        m_lstSyncCmd.push_back(ENSyncCmd::ENSC_SYNC_CONFIG_TO_CXCLOUD);
-    }
-    m_mutexLstSyncCmd.unlock();
+    // Offline AD5X build: cloud configuration synchronization is disabled.
 }
 
 void SyncUserPresets::setAppHasStartuped() { 

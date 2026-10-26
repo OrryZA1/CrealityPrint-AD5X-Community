@@ -1054,8 +1054,9 @@ void BBLTopbar::Init(wxFrame* parent)
     m_tabs_leading_spacer_item = AddStretchSpacer(1);
     //CX
     ButtonsCtrl* pCtr = new ButtonsCtrl(this);
-    pCtr->InsertPage(MainFrame::tpAICreation, _L("AI Creation"), false, "tab_ai_creation");
-    pCtr->InsertPage(MainFrame::tpOnlineModel, _L("Online Models"), 0);
+    // AD5X UI: AI Creation topbar button omitted; page internals untouched.
+    // AD5X UI: Online Models topbar button omitted; page internals untouched.
+    pCtr->InsertPage(MainFrame::tpAD5XDesign, _L("Design"), 0);
     pCtr->InsertPage(MainFrame::tp3DEditor, _L("Prepare"), 0);
     pCtr->InsertPage(MainFrame::tpPreview, _L("Preview"), 0);
     pCtr->InsertPage(MainFrame::tpDeviceMgr, _L("Device"), 0);

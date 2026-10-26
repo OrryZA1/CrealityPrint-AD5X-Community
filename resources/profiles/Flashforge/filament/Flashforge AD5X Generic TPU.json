@@ -1,0 +1,14 @@
+{
+    "type":  "filament",
+    "name":  "Flashforge AD5X Generic TPU",
+    "from":  "system",
+    "setting_id":  "AD5X-TPU-01",
+    "instantiation":  "true",
+    "inherits":  "Flashforge Generic TPU",
+    "compatible_printers":  [
+                                "Flashforge AD5X 0.4 nozzle"
+                            ],
+    "filament_cooling_moves":  [
+                                   "0"
+                               ]
+}

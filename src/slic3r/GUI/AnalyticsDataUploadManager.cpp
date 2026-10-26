@@ -182,6 +182,13 @@ AnalyticsDataUploadManager::~AnalyticsDataUploadManager()
 
 void AnalyticsDataUploadManager::triggerUploadTasks(AnalyticsUploadTiming triggerTiming, const std::vector<AnalyticsDataEventType>& dataEventTypes, int plate_idx, const std::string& device_mac)
 {
+    // Offline AD5X build: analytics collection/upload is disabled.
+    (void)triggerTiming;
+    (void)dataEventTypes;
+    (void)plate_idx;
+    (void)device_mac;
+    return;
+
     try
     {
         if(wxGetApp().is_privacy_checked()) {
@@ -200,6 +207,12 @@ void AnalyticsDataUploadManager::triggerUploadTasks(AnalyticsUploadTiming trigge
 
 void AnalyticsDataUploadManager::triggerUploadTasksWithPayload(const AnalyticsEventPayload& payload, int plate_idx, const std::string& device_mac)
 {
+    // Offline AD5X build: analytics collection/upload is disabled.
+    (void)payload;
+    (void)plate_idx;
+    (void)device_mac;
+    return;
+
     try
     {
         if (wxGetApp().is_privacy_checked()) {
@@ -1126,6 +1139,11 @@ void AnalyticsDataUploadManager::uploadClickHomePageCrealitymallEvent()
 
 void AnalyticsDataUploadManager::track_model_action(const std::string& event_name, nlohmann::json& js)
 {
+    // Offline AD5X build: telemetry transport is disabled at the final boundary.
+    (void)event_name;
+    (void)js;
+    return;
+
     if (js.find("app_version") == js.end())
         js["app_version"] = GUI_App::format_display_version().c_str();
     if (js.find("operating_system") == js.end())
@@ -1144,6 +1162,10 @@ void AnalyticsDataUploadManager::track_model_action(const std::string& event_nam
 
 void AnalyticsDataUploadManager::track_model_action_delayed_print_send(const nlohmann::json& js)
 {
+    // Offline AD5X build: do not schedule delayed telemetry timers.
+    (void)js;
+    return;
+
     // Serialize JSON to string - this is safe and persists across timer callbacks
     const std::string json_str = js.dump();
 
@@ -1327,6 +1349,11 @@ void AnalyticsDataUploadManager::uploadAiServiceCallEvent()
 
 void AnalyticsDataUploadManager::uploadSlice822ClickEvent(const std::string& module, int id)
 {
+    // Offline AD5X build: analytics collection/upload is disabled.
+    (void)module;
+    (void)id;
+    return;
+
     try {
         nlohmann::json payload;
         payload["type_code"] = "slice822";
@@ -1365,6 +1392,10 @@ bool AnalyticsDataUploadManager::should_send_print_event() const
 
 void AnalyticsDataUploadManager::send_print_send_event(int plate_idx)
 {
+    // Offline AD5X build: keep print/slicing behavior, suppress analytics only.
+    (void)plate_idx;
+    return;
+
     // 统一的发送条件判断
     if (!should_send_print_event()) {
         return;
@@ -1537,6 +1568,9 @@ void AnalyticsDataUploadManager::init_sensors_config_if_needed()
 
 bool AnalyticsDataUploadManager::test_sensors_connection()
 {
+    // Offline AD5X build: never probe Creality analytics endpoints.
+    return false;
+
     try {
         // 先初始化配置获取 URL
         getInstance().init_sensors_config_if_needed();
@@ -1570,6 +1604,10 @@ bool AnalyticsDataUploadManager::test_sensors_connection()
 
 void AnalyticsDataUploadManager::send_sensors_payload_to_creality(const nlohmann::json& payload)
 {
+    // Offline AD5X build: direct Sensors Analytics transport is disabled.
+    (void)payload;
+    return;
+
     try {
         // 初始化配置（仅首次调用时执行）
         init_sensors_config_if_needed();

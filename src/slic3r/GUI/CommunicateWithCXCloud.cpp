@@ -235,7 +235,11 @@ CommunicateWithCXCloud::CommunicateWithCXCloud(){
 CommunicateWithCXCloud::~CommunicateWithCXCloud() {}
 
 int CommunicateWithCXCloud::getUserProfileList(std::vector<UserProfileListItem>& vtUserProfileListItem)
-{ 
+{
+    // Offline AD5X build: cloud account/profile queries are disabled.
+    vtUserProfileListItem.clear();
+    return -1;
+
     int         nRet                  = -1;
     std::string version               = ""; // preset_bundle->get_vendor_profile_version(PresetBundle::BBL_BUNDLE).to_string();
     std::string version_type          = get_vertion_type();
@@ -324,6 +328,11 @@ int CommunicateWithCXCloud::getUserProfileList(std::vector<UserProfileListItem>&
 
 int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userProfileListItem, std::string& saveJsonFile)
 {
+    // Offline AD5X build: cloud preset download is disabled.
+    (void)userProfileListItem;
+    saveJsonFile.clear();
+    return -1;
+
     BOOST_LOG_TRIVIAL(warning) << "SyncUserPresets downloadUserPreset start...";
     BOOST_LOG_TRIVIAL(warning) << "CommunicateWithCXCloud downloadUserPreset id=" << userProfileListItem.id
         << " type=" << userProfileListItem.type << " name=" << userProfileListItem.printerIntName << " url=" << userProfileListItem.zipUrl;
@@ -574,6 +583,11 @@ int CommunicateWithCXCloud::downloadUserPreset(const UserProfileListItem& userPr
 
 int CommunicateWithCXCloud::preUpdateProfile_create(const UploadFileInfo& fileInfo, PreUpdateProfileRetInfo& retInfo)
 {
+    // Offline AD5X build: cloud preset creation/upload is disabled.
+    (void)fileInfo;
+    (void)retInfo;
+    return -1;
+
     int nRet = -1;
 
     std::string base_url = get_cloud_api_url();
@@ -660,7 +674,12 @@ int CommunicateWithCXCloud::preUpdateProfile_create(const UploadFileInfo& fileIn
 }
 
 int CommunicateWithCXCloud::preUpdateProfile_update(const UploadFileInfo& fileInfo, PreUpdateProfileRetInfo& retInfo)
-{ 
+{
+    // Offline AD5X build: cloud preset update/upload is disabled.
+    (void)fileInfo;
+    (void)retInfo;
+    return -1;
+
     int nRet = -1;
 
     std::string version_type          = get_vertion_type();
@@ -745,6 +764,10 @@ int CommunicateWithCXCloud::preUpdateProfile_update(const UploadFileInfo& fileIn
 //  删除用户预设
 int CommunicateWithCXCloud::deleteProfile(const std::string& ssDeleteSettingId)
 {
+    // Offline AD5X build: cloud preset deletion is disabled.
+    (void)ssDeleteSettingId;
+    return -1;
+
     int nRet = -1;
     if (ssDeleteSettingId.empty())
         return nRet;

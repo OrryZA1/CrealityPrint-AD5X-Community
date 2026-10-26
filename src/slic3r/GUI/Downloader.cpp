@@ -130,6 +130,10 @@ Downloader::Downloader()
 
 void Downloader::start_download(const std::string& full_url)
 {
+    // Offline AD5X build: protocol-triggered remote downloads are disabled.
+    (void)full_url;
+    return;
+
 	assert(m_initialized);
 
     // Orca: Move to the 3D view

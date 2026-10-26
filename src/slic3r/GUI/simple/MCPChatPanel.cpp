@@ -2999,6 +2999,10 @@ void MCPChatWindow::OnParentIconize(wxIconizeEvent& evt)
 
 void MCPChatWindow::Toggle(wxWindow* parent)
 {
+    // Offline AD5X build: cloud-backed AI chat window is disabled.
+    (void)parent;
+    return;
+
     // if (activate_embedded_chat_panel_if_available())
     //     return;
 
@@ -3012,6 +3016,10 @@ void MCPChatWindow::Toggle(wxWindow* parent)
 
 void MCPChatWindow::Show(wxWindow* parent)
 {
+    // Offline AD5X build: cloud-backed AI chat window is disabled.
+    (void)parent;
+    return;
+
     // if (activate_embedded_chat_panel_if_available())
     //     return;
 

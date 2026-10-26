@@ -7970,6 +7970,9 @@ void Plater::priv::select_brim_ears() {
 
 void Plater::priv::select_ai_cloud_service()
 {
+    // Offline AD5X build: Creality AI Cloud service is disabled.
+    return;
+
     if (!Slic3r::GUI::wxGetApp().is_login()) {
         wxGetApp().swith_community_sub_page("login");
     } else {
@@ -8110,12 +8113,8 @@ void Plater::priv::update_ui_from_settings()
 
 bool Plater::priv::easy_mode_ai_dock_enabled() const
 {
-    auto* cfg = wxGetApp().app_config;
-    if (cfg == nullptr)
-        return true;
-
-    const std::string value = cfg->get(kEasyModeLayoutSection, kEasyAIDockEnabledKey);
-    return value.empty() || value == "true" || value == "1";
+    // Offline AD5X build: never instantiate the cloud-backed Easy Mode AI dock.
+    return false;
 }
 
 int Plater::priv::get_default_easy_ai_dock_width_px() const
@@ -14660,6 +14659,10 @@ bool Plater::priv::on_action_send_to_local_net_printer(bool isall, bool skip_saf
 
 void Plater::priv::on_action_upload_3mf(bool isall)
 {
+    // Offline AD5X build: Creality Cloud project upload is disabled.
+    (void)isall;
+    return;
+
     if (!m_upload_3mf_dlg)
         m_upload_3mf_dlg = new Upload3mfToCloudDialog(q);
 
@@ -14676,6 +14679,9 @@ void Plater::priv::on_action_upload_3mf(bool isall)
 
 void Plater::priv::on_action_upload_gcode()
 {
+    // Offline AD5X build: Creality Cloud G-code upload is disabled.
+    return;
+
     if (!m_upload_gcode_dlg)
         m_upload_gcode_dlg = new UploadGcodeToCloudDialog(q);
 
@@ -17250,6 +17256,11 @@ wxString SanitizeFilename(const wxString& filename)
 void Plater::import_model_id(wxString download_info)
 {
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << __LINE__ << " download info: " << download_info;
+    if (download_info.StartsWith(wxT("http://")) || download_info.StartsWith(wxT("https://"))) {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": remote project/model import is disabled in this offline build";
+        return;
+    }
+
     boost::filesystem::path target_path;
     bool      download_ok = false;
     wxString msg;
@@ -17567,9 +17578,8 @@ void Plater::download_project(const wxString& project_id) { return; }
 
 void Plater::request_model_download(wxString url)
 {
-    wxCommandEvent* event = new wxCommandEvent(EVT_IMPORT_MODEL_ID);
-    event->SetString(url);
-    wxQueueEvent(this, event);
+    // Offline AD5X build: remote/custom-link model downloads are disabled.
+    (void)url;
 }
 
 void Plater::request_download_project(std::string project_id)

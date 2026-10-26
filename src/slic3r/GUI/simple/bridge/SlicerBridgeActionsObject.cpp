@@ -409,6 +409,10 @@ void SlicerBridge::ClearPendingModelSearchCache()
 
 json SlicerBridge::DoOpenModelLibrary(const json& params)
 {
+    // Offline AD5X build: online model library is disabled.
+    (void)params;
+    return {{"success", false}, {"code", "OFFLINE_DISABLED"}, {"message", "Online model library is disabled in this offline build"}};
+
     auto* mainframe = wxGetApp().mainframe;
     if (!mainframe)
         return {{"success", false}, {"message", "MainFrame not available"}};
@@ -435,6 +439,10 @@ json SlicerBridge::DoOpenModelLibrary(const json& params)
 
 json SlicerBridge::DoRecommendModel(const json& params)
 {
+    // Offline AD5X build: cloud model recommendations are disabled.
+    (void)params;
+    return {{"success", false}, {"code", "OFFLINE_DISABLED"}, {"message", "Cloud model recommendations are disabled in this offline build"}};
+
     auto parse_int_param = [&params](const char* key, int fallback) {
         int value = fallback;
         try {
@@ -639,6 +647,10 @@ json SlicerBridge::DoRecommendModel(const json& params)
 
 json SlicerBridge::DoSmartModelSearch(const json& params)
 {
+    // Offline AD5X build: cloud model search is disabled.
+    (void)params;
+    return {{"success", false}, {"code", "OFFLINE_DISABLED"}, {"message", "Cloud model search is disabled in this offline build"}};
+
     auto trim = [](std::string value) {
         const auto is_ws = [](unsigned char ch) { return std::isspace(ch) != 0; };
         while (!value.empty() && is_ws(static_cast<unsigned char>(value.front()))) value.erase(value.begin());
@@ -803,6 +815,10 @@ json SlicerBridge::DoSmartModelSearch(const json& params)
 
 json SlicerBridge::DoImportModelFromSearch(const json& params)
 {
+    // Offline AD5X build: importing models from Creality Cloud search is disabled.
+    (void)params;
+    return {{"success", false}, {"code", "OFFLINE_DISABLED"}, {"message", "Cloud model import is disabled in this offline build"}};
+
     auto* plater = wxGetApp().plater();
     if (!plater)
         return {{"success", false}, {"message", "Plater not available"}};

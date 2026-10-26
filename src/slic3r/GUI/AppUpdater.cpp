@@ -696,6 +696,9 @@ void AppUpdater::download_packages()
 
 void AppUpdater::install_update()
 {
+    // AD5X 7.3 production freeze: never launch an in-app updater or installer.
+    return;
+
     // Execute the installer or updater
 #ifdef _WIN32
     if (m_is_hot_update) {

@@ -18,7 +18,6 @@
 #include "libslic3r_version.h"
 #include "libslic3r/Utils.hpp"
 #include "../../print_manage/data/DataCenter.hpp"
-#include <fstream>
 #include <string>
 #include "slic3r/GUI/Notebook.hpp"
 #include "slic3r/GUI/simple/DeviceListSimple.hpp"
@@ -107,19 +106,8 @@ bool EasyPrintSender::tryStartPrintCloudClosedLoop(const std::string&    deviceI
 }
 void EasyPrintSender::logMessage(const std::string& tag, const std::string& content)
 {
-#define _DEBUG1
-#ifdef _DEBUG1
-    std::ofstream logFile("D:/log.txt", std::ios::app);
-    if (logFile.is_open()) {
-        std::time_t now = std::time(nullptr);
-        char        buf[64];
-        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-
-        logFile << "[" << buf << "][" << tag << "]" << content << "\n ";
-
-        logFile.close();
-    }
-#endif
+    // Keep LAN send diagnostics without writing to a machine-specific drive.
+    std::clog << "[" << tag << "] " << content << std::endl;
 }
 
 static std::string baseName(const std::string& fullPath)
