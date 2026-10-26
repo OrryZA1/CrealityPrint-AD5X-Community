@@ -1,5 +1,16 @@
 # Changelog
 
+## Privacy-clean installer repack — 2026-10-26
+
+- Withdrew the original public RC1 installer after discovering it seeded personal/user filament and process presets.
+- Removed all user filament presets, including the experimental Tgood profile.
+- Removed all user process/slicer presets.
+- Removed personal preset selections/references from the initial `Creality.conf` seed.
+- Switched the initial selection to generic system presets: `Flashforge AD5X Generic PLA` and `0.20mm Standard @FF AD5X`.
+- Public seed reduced from 211 files to 204 files.
+- Privacy-clean package verification passed; a new install/uninstall smoke was not rerun so the existing local RC1 installation/data remained untouched.
+- Replacement installer SHA-256: `DD2A81FBB2DD5D3A9C083A684882E4F521A8C777248FEF51D9F41F3876F467FB`.
+
 ## GitHub source/presentation update — 2026-10-26
 
 - Published the accepted built-in AD5X Design workspace source under `design/`.
@@ -8,7 +19,7 @@
 - Added Design screenshots and a 42-second Design → Prepare → Preview demonstration.
 - Reworked the project front page to explain the Design workflow before the lower-level AD5X/offline changes.
 - Added Sculpo/Design and Manifold provenance/licence notes.
-- The Windows RC1 installer binary is unchanged by this source/documentation update.
+- At this source/documentation step the Windows RC1 installer was unchanged; it was subsequently replaced by the privacy-clean repack documented above.
 
 ## v7.3.0-ad5x-rc1
 
@@ -40,6 +51,6 @@ The RC1 installer was built separately from the source repository and verified b
 
 Installer SHA-256:
 
-`F11686C0904A7D07BF0F89EC5845913765B3D2903203FD3B5E873ACB61ACD05E`
+`DD2A81FBB2DD5D3A9C083A684882E4F521A8C777248FEF51D9F41F3876F467FB`
 
 See [RELEASE_NOTES_RC1.md](RELEASE_NOTES_RC1.md).

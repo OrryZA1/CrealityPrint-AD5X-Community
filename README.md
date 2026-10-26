@@ -14,7 +14,7 @@
 
 **Installer:** `CrealityPrint_7.3_AD5X_Offline_RC1_Setup.exe`
 
-**SHA-256:** `F11686C0904A7D07BF0F89EC5845913765B3D2903203FD3B5E873ACB61ACD05E`
+**SHA-256:** `DD2A81FBB2DD5D3A9C083A684882E4F521A8C777248FEF51D9F41F3876F467FB`
 
 ---
 
@@ -119,16 +119,20 @@ The original CrealityPrint slicing engine remains the base of the project.
 
 ## RC1 verification
 
-The released installer has been verified for:
+The current public installer is a **privacy-clean repack**. It contains no personal/user filament profiles and no user process/slicer presets. It uses only generic FlashForge AD5X system presets in the initial seed.
 
-- installer compilation;
-- isolated installation;
-- **10,269 / 10,269** installed application file hashes;
-- **211 / 211** seeded configuration files;
-- isolated uninstall;
-- preservation of the packaged RC1 application payload.
+The privacy-clean package has been verified for:
 
-Before final packaging, project acceptance covered startup, Design/Prepare, slicing/preview, Device/Fluidd and Send Print. The final packaging pass itself did **not** repeat a new physical print and full post-installer GUI acceptance cycle, so those earlier functional results are not represented as a fresh installer-level retest.
+- successful Inno Setup compilation;
+- **10,269 / 10,269** application files against the release manifest;
+- **204 / 204** seed files against the release manifest;
+- zero personal preset names or user filament/process preset folders in the packaged seed/compiler inputs;
+- exact Setup EXE hash match between the canonical output and release copy;
+- exact Setup EXE hash match inside the one-file ZIP.
+
+A new install/uninstall smoke test was **not** rerun for the privacy repack because the existing local RC1 installation/data were preserved. Earlier installer smoke evidence applies to the pre-privacy-repack package only.
+
+Before release packaging, project acceptance covered startup, Design/Prepare, slicing/preview, Device/Fluidd and Send Print. No new physical print or full post-installer GUI workflow was run for this privacy repack.
 
 ## Important signing note
 
