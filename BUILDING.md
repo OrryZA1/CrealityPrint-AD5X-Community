@@ -64,4 +64,3 @@ See [THIRD_PARTY.md](THIRD_PARTY.md).
 
 Do not run destructive dependency-clean/build scripts against an existing known-good development tree without reviewing them first. Use a separate build directory or disposable clone.
 
-This repository will be updated with the exact public-tree build command and result once that build has been independently verified.

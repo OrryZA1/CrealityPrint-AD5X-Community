@@ -2,7 +2,7 @@
 
 ## CrealityPrint 7.3 AD5X Offline RC1
 
-Planned tag:
+Release tag:
 
 `v7.3.0-ad5x-rc1`
 

@@ -25,7 +25,7 @@ The public RC1 changeset is intentionally limited to the source changes required
 
 ## RC1 release
 
-Release tag planned:
+Release tag:
 
 `v7.3.0-ad5x-rc1`
 
