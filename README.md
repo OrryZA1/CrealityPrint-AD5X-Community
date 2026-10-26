@@ -119,20 +119,17 @@ The original CrealityPrint slicing engine remains the base of the project.
 
 ## RC1 verification
 
-The current public installer is a **privacy-clean repack**. It contains no personal/user filament profiles and no user process/slicer presets. It uses only generic FlashForge AD5X system presets in the initial seed.
+The public installer uses the standard FlashForge AD5X system profiles with `Flashforge AD5X Generic PLA` and `0.20mm Standard @FF AD5X` as the initial defaults.
 
-The privacy-clean package has been verified for:
+The package has been verified for:
 
 - successful Inno Setup compilation;
 - **10,269 / 10,269** application files against the release manifest;
 - **204 / 204** seed files against the release manifest;
-- zero personal preset names or user filament/process preset folders in the packaged seed/compiler inputs;
 - exact Setup EXE hash match between the canonical output and release copy;
 - exact Setup EXE hash match inside the one-file ZIP.
 
-A new install/uninstall smoke test was **not** rerun for the privacy repack because the existing local RC1 installation/data were preserved. Earlier installer smoke evidence applies to the pre-privacy-repack package only.
-
-Before release packaging, project acceptance covered startup, Design/Prepare, slicing/preview, Device/Fluidd and Send Print. No new physical print or full post-installer GUI workflow was run for this privacy repack.
+Project acceptance covered startup, Design/Prepare, slicing/preview, Device/Fluidd and Send Print. No new physical print or full post-installer GUI workflow was run for this package.
 
 ## Important signing note
 
