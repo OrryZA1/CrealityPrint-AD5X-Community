@@ -1,5 +1,15 @@
 # Changelog
 
+## GitHub source/presentation update — 2026-10-26
+
+- Published the accepted built-in AD5X Design workspace source under `design/`.
+- Added portable regression fixtures so a clean public Design source tree can run its test suite without the historical development-directory layout.
+- Verified the public Design copy: 87 / 87 test files and 635 / 635 tests passed; TypeScript/Vite/PWA production build passed.
+- Added Design screenshots and a 42-second Design → Prepare → Preview demonstration.
+- Reworked the project front page to explain the Design workflow before the lower-level AD5X/offline changes.
+- Added Sculpo/Design and Manifold provenance/licence notes.
+- The Windows RC1 installer binary is unchanged by this source/documentation update.
+
 ## v7.3.0-ad5x-rc1
 
 Initial public RC1 source release based on the preserved Creality Print 7.3 source baseline.
